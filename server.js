@@ -1,3 +1,5 @@
+const { Sequelize } = require('sequelize');
+const sequelize = new Sequelize('sqlite::memory:');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 

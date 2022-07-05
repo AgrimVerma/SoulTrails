@@ -7,6 +7,7 @@ const mongoSanitize = require('express-mongo-sanitize');
 const XSS = require('xss-clean');
 const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
+const cors = require('cors');
 
 const AppError = require('./utils/appError');
 const globalErrorHandler = require('./controllers/errorController');
@@ -25,7 +26,21 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(`${__dirname}/public`));
 
 // Set Security HTTP Header
-app.use(helmet());
+helmet({
+   contentSecurityPolicy: {  
+       useDefaults: true, 
+       directives: { 
+           'script-src': 'self"' ,
+           'default-src': ['self"', 'unsafe-inline']
+        }  
+    }  
+});
+app.use(cors({
+ 	credentials : true,
+ 	origin:'http://localhost:3000' ,
+    SameSite : 'none',
+    secure: true
+}));
 
 // Development Logging
 if(process.env.NODE_ENV === 'development') {
@@ -64,7 +79,6 @@ app.use(
     })
 );
 
-
 // 3). ROUTES
 app.use('/', viewRouter);
 app.use('/api/v1/tours', tourRouter);
@@ -72,7 +86,6 @@ app.use('/api/v1/users', userRouter);
 app.use('/api/v1/reviews', reviewRouter);
 
 app.all('*', (req, res, next) => {
-    
     next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 

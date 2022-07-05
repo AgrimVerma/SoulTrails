@@ -1,28 +1,28 @@
 [
   {
     "startLocation": {
-      "description": "Miami, USA",
+      "description": "Sankri, Uttarakhand",
       "type": "Point",
       "coordinates": [-80.185942, 25.774772],
-      "address": "301 Biscayne Blvd, Miami, FL 33132, USA"
+      "address": "Mori, Sankari Rd, Mautar, Uttarakhand, 249128 "
     },
     "ratingsAverage": 4.8,
     "ratingsQuantity": 6,
     "images": ["tour-2-1.jpg", "tour-2-2.jpg", "tour-2-3.jpg"],
     "startDates": [
-      "2021-06-19T09:00:00.000Z",
-      "2021-07-20T09:00:00.000Z",
-      "2021-08-18T09:00:00.000Z"
+      "2021-10-19T09:00:00.000Z",
+      "2021-11-20T09:00:00.000Z",
+      "2021-12-18T09:00:00.000Z"
     ],
     "_id": "5c88fa8cf4afda39709c2955",
-    "name": "The Sea Explorer",
-    "duration": 7,
-    "maxGroupSize": 15,
+    "name": "Kedarkantha Trek",
+    "duration": 6,
+    "maxGroupSize": 20,
     "difficulty": "medium",
     "guides": ["5c8a22c62f8fb814b56fa18b", "5c8a1f4e2f8fb814b56fa185"],
-    "price": 497,
-    "summary": "Exploring the jaw-dropping US east coast by foot and by boat",
-    "description": "Consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\nIrure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
+    "price": 8000,
+    "summary": "One Of The Finest Summit Climbs For Beginners",
+    "description": "Kedarkantha is a 6-day long trek in Govind Pashu Vihar National Park in Uttarakhand (6 when including the travel days from Dehradun to the base camp and back). Kedarkantha is easily one of the most popular treks in India — popular amongst seasoned trekkers and beginners alike.The summit climb of Kedarkantha is a very rewarding one.  Right from the base camp of the trek, the summit looms large.  As you start your trek in the early hours of the morning and steadily climb up the steep slope, the world opens up around you. ",
     "imageCover": "tour-2-cover.jpg",
     "locations": [
       {
@@ -57,21 +57,21 @@
   },
   {
     "startLocation": {
-      "description": "Banff, CAN",
+      "description": "Haridwar, Uttarakhand",
       "type": "Point",
       "coordinates": [-115.570154, 51.178456],
-      "address": "224 Banff Ave, Banff, AB, Canada"
+      "address": "Jolly Grant Airport, Dehradun"
     },
     "ratingsAverage": 5,
     "ratingsQuantity": 9,
     "images": ["tour-1-1.jpg", "tour-1-2.jpg", "tour-1-3.jpg"],
     "startDates": [
-      "2021-04-25T09:00:00.000Z",
-      "2021-07-20T09:00:00.000Z",
-      "2021-10-05T09:00:00.000Z"
+      "2021-10-25T09:00:00.000Z",
+      "2021-11-20T09:00:00.000Z",
+      "2021-12-05T09:00:00.000Z"
     ],
     "_id": "5c88fa8cf4afda39709c2951",
-    "name": "The Forest Hiker",
+    "name": "Kuari Pass Trek",
     "duration": 5,
     "maxGroupSize": 25,
     "difficulty": "easy",
@@ -81,8 +81,8 @@
       "5c8a1f292f8fb814b56fa184"
     ],
     "price": 397,
-    "summary": "Breathtaking hike through the Canadian Banff National Park",
-    "description": "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.\nLorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+    "summary": "The Best Mix Of Mountains, Meadows and Forests",
+    "description": "With a visit to popular pilgrim cities such as Rishikesh, Devprayag, Joshimath, and Haridwar, the Kuari pass trek, situated in Garhwal Himalaya is a 33 KM long journey. The trek is famous for letting you onlook India second-highest peak, Mount Nanda Devi. The trek at an altitude of 12,516 ft. also offers you summit views of Dronagiri, Chitrakantha, Chaukhamba, and Tali top. The Interlude of meadows, beautiful forests blooming with rhododendron, and oak trees make your path all the more scenic. While on the trek, you can also admire the mesmerizing views of holy rivers such as Bhagirathi and Alakananda which makes the ascent even more exciting.",
     "imageCover": "tour-1-cover.jpg",
     "locations": [
       {
