@@ -28,7 +28,7 @@ jobs:
         
   version-tag:
     name: Git Version Tagging
-    runs-on: [self-hosted, eks-runner]
+    runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
