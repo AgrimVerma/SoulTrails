@@ -88,3 +88,19 @@ jobs:
               tag_name: '${{ steps.version.outputs.version }}',
               generate_release_notes: true
             })
+
+      - name: Publish to Confluence
+        id: run_action
+        uses: Gershon-A/publish-release-to-confluence@main
+        with:
+          spaceId: ${{ vars.163842}}
+          status: 'current'
+          title: "Release: ${{ github.ref_name }}"
+          parentId: 163998
+          ConfluenceBaseUrl: 'https://agrim.atlassian.net'
+          tag: v${{ needs.release.outputs.releaseVersion }}
+          confluence_email: ${{ vars.CONFLUENCE_EMAIL }}
+          confluence_api_token: ${{ secrets.CONFLUENCE_API_TOKEN }}
+          appName:   ${{ github.event.repository.name }}
+          repoOwner: ${{ github.repository_owner }}
+          repoName:  ${{ github.event.repository.name }}
