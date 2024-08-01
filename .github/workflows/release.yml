@@ -18,7 +18,9 @@ jobs:
           node-version: '14'  # Specify your Node.js version
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
 
       - name: Generate Version Tag
         id: version
