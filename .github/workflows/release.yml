@@ -102,7 +102,7 @@ jobs:
           title: "Release: ${{ github.ref_name }}"
           parentId: '163998'
           ConfluenceBaseUrl: 'https://agrim.atlassian.net'
-          tag: v${{ needs.release.outputs.releaseVersion }}
+          tag: ${{ github.ref_name }}
           confluence_email: ${{ vars.CONFLUENCE_EMAIL }}
           confluence_api_token: ${{ secrets.CONFLUENCE_API_TOKEN }}
           appName:   ${{ github.event.repository.name }}
