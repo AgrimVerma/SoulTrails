@@ -1,0 +1,33 @@
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master, add/gh-action-prod ]
+
+name: Deploy Production CGK
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'  # Specify your Node.js version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Version Tag
+        id: version
+        uses: codacy/git-version@2.4.0
+        with:
+          prefix: "v"
+
+      - name: Create Release with Semantic Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}  # If you publish to npm
+        run: npx semantic-release
