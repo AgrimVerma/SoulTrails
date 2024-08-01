@@ -15,7 +15,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '18'  # Specify your Node.js version
+          node-version: '20'  # Specify your Node.js version
 
       - name: Clear npm cache
         run: npm cache clean --force
