@@ -88,9 +88,10 @@ jobs:
               tag_name: '${{ steps.version.outputs.version }}',
               generate_release_notes: true
             })
+
   create-confluence-page:
     runs-on: ubuntu-latest
-    needs: [ build ]
+    needs: [ build, version-tag ]
     steps:
 
       - name: Publish to Confluence
