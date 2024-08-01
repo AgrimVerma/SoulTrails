@@ -19,11 +19,12 @@ jobs:
 
       - name: Clear npm cache
         run: npm cache clean --force
+
+      - name: Check Node.js Version
+        run: node --version
       
       - name: Install dependencies
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install
+        run: npm install
 
       - name: Generate Version Tag
         id: version
