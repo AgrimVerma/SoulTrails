@@ -93,10 +93,10 @@ jobs:
         id: run_action
         uses: Gershon-A/publish-release-to-confluence@main
         with:
-          spaceId: 163842
+          spaceId: '163842'
           status: 'current'
           title: "Release: ${{ github.ref_name }}"
-          parentId: 163998
+          parentId: '163998'
           ConfluenceBaseUrl: 'https://agrim.atlassian.net'
           tag: v${{ needs.release.outputs.releaseVersion }}
           confluence_email: ${{ vars.CONFLUENCE_EMAIL }}
