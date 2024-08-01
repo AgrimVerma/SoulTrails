@@ -93,7 +93,7 @@ jobs:
         id: run_action
         uses: Gershon-A/publish-release-to-confluence@main
         with:
-          spaceId: ${{ vars.163842}}
+          spaceId: 163842
           status: 'current'
           title: "Release: ${{ github.ref_name }}"
           parentId: 163998
