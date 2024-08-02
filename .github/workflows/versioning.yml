@@ -24,11 +24,12 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_run" ]; then
             echo "This is a rerun"
-            echo "::set-output name=rerun::true"
+            echo "rerun=true" >> $GITHUB_ENV
           else
             echo "This is a fresh run"
-            echo "::set-output name=rerun::false"
+            echo "rerun=false" >> $GITHUB_ENV
           fi
+          echo "::set-output name=rerun::$rerun"
 
       - name: Create Version Tagging
         if: steps.check_rerun.outputs.rerun == 'false'
