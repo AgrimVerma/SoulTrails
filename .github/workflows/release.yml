@@ -17,14 +17,8 @@ jobs:
         with:
           node-version: '20'  # Specify your Node.js version
 
-      - name: Clear npm cache
-        run: npm cache clean --force
-
       - name: Check Node.js Version
         run: node --version
-      
-      - name: Install dependencies
-        run: npm install
         
   version-tag:
     name: Git Version Tagging
@@ -88,3 +82,88 @@ jobs:
               tag_name: '${{ steps.version.outputs.version }}',
               generate_release_notes: true
             })
+
+  create-confluence-page:
+    runs-on: ubuntu-latest
+    needs: [ build, version-tag ]
+    steps:
+      - name: Get Release
+        id: get-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ needs.version-tag.outputs.version }}';
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: '${{ github.repository_owner }}',
+              repo: '${{ github.event.repository.name }}',
+              tag: tag
+            });
+            if (!release || !release.data.body) {
+                console.error('Invalid release');
+                return;
+            }
+            console.log(release.data.body);
+            return {
+                body: release.data.body,
+                url: `https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/releases/tag/${tag}`
+            };
+  
+      - name: Post Release Notes to Confluence
+        id: post_to_confluence
+        shell: bash
+        env:
+          RELEASE_NOTES: ${{ fromJSON(steps.get-release.outputs.result).body }}
+          RELEASE_URL: ${{ fromJSON(steps.get-release.outputs.result).url }}
+        run: |
+          # Add additional line before the content
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}"
+  
+          # Remove '##' from RELEASE_NOTES
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
+  
+          # Remove extra HTML
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/<[^>]*>//g')
+  
+          # Replace markdown links with confluence links
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g')
+  
+          # Replace @username with a link to the user's GitHub profile
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g')
+  
+          # Replace '\n' with '<br/>'
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/\\n/<br\/>/g')
+  
+          # Prepare the payload
+          payload=$(jq -n \
+          --arg spaceId "163842" \
+          --arg status "current" \
+          --arg title "Release: ${{ needs.version-tag.outputs.version }}" \
+          --arg parentId "163998" \
+          --arg value "$RELEASE_NOTES" \
+          '{
+              "spaceId": $spaceId,
+              "status": $status,
+              "title": $title,
+              "parentId": $parentId,
+              "body": {
+              "representation": "wiki",
+              "value": $value
+              }
+          }'
+          )
+  
+          echo "Payload: $payload"
+          response=$(curl --request POST \
+              --url 'https://agrim.atlassian.net/wiki/api/v2/pages' \
+              --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
+              --header 'Accept: application/json' \
+              --header 'Content-Type: application/json' \
+              --data "$payload")
+          echo "Response: $response"
+          pageId=$(echo "$response" | jq -r '.id')
+          echo "Page ID: $pageId"
+          if [ "$pageId" == "null" ]; then
+            echo "Failed to create page"
+            exit 1
+          fi
+          echo "pageId=$pageId" >> $GITHUB_ENV
