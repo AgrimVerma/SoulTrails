@@ -1,1 +1,1 @@
-testing semantic versioning 3.3.0
+testing semantic versioning 3.6.0
