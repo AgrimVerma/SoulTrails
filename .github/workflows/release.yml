@@ -15,7 +15,35 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '20'  # Specify your Node.js version
+          node-version: '20'
 
-      - name: Check Node.js Version
-        run: node --version
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build and deploy
+        run: npm run deploy  # Replace with your actual deployment command
+
+  trigger-versioning:
+    name: Trigger Versioning and Confluence Update
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Check if rerun
+        id: check-rerun
+        run: |
+          if [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
+            echo "This is a fresh run"
+            echo "rerun=false" >> $GITHUB_ENV
+          else
+            echo "This is a rerun"
+            echo "rerun=true" >> $GITHUB_ENV
+          fi
+          echo "::set-output name=rerun::${{ env.rerun }}"
+
+      - name: Trigger Versioning and Confluence Workflow
+        if: steps.check-rerun.outputs.rerun == 'false'
+        uses: peter-evans/workflow-dispatch@v2
+        with:
+          repository: ${{ github.repository }}
+          workflow: version-and-confluence.yml
+          ref: ${{ github.ref }}
