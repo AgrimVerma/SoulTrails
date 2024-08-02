@@ -1,1 +1,1 @@
-testing semantic versioning 5.0
+testing semantic versioning 6.0
