@@ -17,12 +17,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build and deploy
-        run: npm run deploy  # Replace with your actual deployment command
-
   trigger-versioning:
     name: Trigger Versioning and Confluence Update
     runs-on: ubuntu-latest
