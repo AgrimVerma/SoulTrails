@@ -4,6 +4,7 @@ on:
     branches: [ master, add/gh-action-prod ]
 
 name: Deploy Production CGK
+
 jobs:
   build:
     name: Release
@@ -26,6 +27,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       publish_docs: ${{ steps.check_commits.outputs.publish_docs }}
+      commit_details: ${{ steps.check_commits.outputs.commit_details }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -84,20 +86,24 @@ jobs:
               generate_release_notes: true
             })
 
-      - name: Check commit messages for feat or break
+      - name: Check commit messages and descriptions for feat or break
         id: check_commits
         run: |
           PUBLISH_DOCS=false
+          COMMIT_DETAILS=""
           for COMMIT in $(git rev-list ${{ github.event.before }}..${{ github.sha }}); do
             COMMIT_MESSAGE=$(git log -1 --pretty=%B $COMMIT)
+            COMMIT_DESCRIPTION=$(git log -1 --pretty=%b $COMMIT)
             echo "Commit message: $COMMIT_MESSAGE"
+            echo "Commit description: $COMMIT_DESCRIPTION"
+            COMMIT_DETAILS="$COMMIT_DETAILS\n- $COMMIT_MESSAGE: $COMMIT_DESCRIPTION"
             if echo "$COMMIT_MESSAGE" | grep -E "feat:|break:"; then
               PUBLISH_DOCS=true
-              break
             fi
           done
           echo "Publish docs to Confluence: $PUBLISH_DOCS"
           echo "::set-output name=publish_docs::$PUBLISH_DOCS"
+          echo "::set-output name=commit_details::$COMMIT_DETAILS"
 
   create-confluence-page:
     runs-on: ubuntu-latest
@@ -131,9 +137,10 @@ jobs:
         env:
           RELEASE_NOTES: ${{ fromJSON(steps.get-release.outputs.result).body }}
           RELEASE_URL: ${{ fromJSON(steps.get-release.outputs.result).url }}
+          COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
         run: |
           # Add additional line before the content
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}"
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}"
   
           # Remove '##' from RELEASE_NOTES
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
