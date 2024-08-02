@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      publish_docs: ${{ steps.check_commit.outputs.publish_docs }}
+      publish_docs: ${{ steps.check_commits.outputs.publish_docs }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -84,18 +84,20 @@ jobs:
               generate_release_notes: true
             })
 
-      - name: Check commit message for feat or break
-        id: check_commit
+      - name: Check commit messages for feat or break
+        id: check_commits
         run: |
-          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
-          echo "Commit message: $COMMIT_MESSAGE"
-          if echo "$COMMIT_MESSAGE" | grep -E "feat:|break:"; then
-            echo "Publish docs to Confluence"
-            echo "::set-output name=publish_docs::true"
-          else
-            echo "Do not publish docs to Confluence"
-            echo "::set-output name=publish_docs::false"
-          fi
+          PUBLISH_DOCS=false
+          for COMMIT in $(git rev-list ${{ github.sha }} ^${{ github.event.pull_request.base.sha }}); do
+            COMMIT_MESSAGE=$(git log -1 --pretty=%B $COMMIT)
+            echo "Commit message: $COMMIT_MESSAGE"
+            if echo "$COMMIT_MESSAGE" | grep -E "feat:|break:"; then
+              PUBLISH_DOCS=true
+              break
+            fi
+          done
+          echo "Publish docs to Confluence: $PUBLISH_DOCS"
+          echo "::set-output name=publish_docs::$PUBLISH_DOCS"
 
   create-confluence-page:
     runs-on: ubuntu-latest
