@@ -139,29 +139,29 @@ jobs:
           RELEASE_URL: ${{ fromJSON(steps.get-release.outputs.result).url }}
           COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
         run: |
-          echo "Commit message: ${RELEASE_URL}"
-          echo "Commit message: ${RELEASE_NOTES}"
-          echo "Commit message: ${COMMIT_DETAILS}"
+          echo "Release url: ${RELEASE_URL}"
+          echo "Release notes: ${RELEASE_NOTES}"
+          echo "Commit details: ${COMMIT_DETAILS}"
           # Add additional line before the content
           RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}"
 
-          echo "Commit message: $RELEASE_NOTES"
+          echo "RELEASE_NOTES: $RELEASE_NOTES"
           # Remove '##' from RELEASE_NOTES
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
 
-          echo "Commit message: $RELEASE_NOTES"
+          echo "RELEASE_NOTES: $RELEASE_NOTES"
           # Remove extra HTML
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/<[^>]*>//g')
 
-          echo "Commit message: $RELEASE_NOTES"
+          echo "RELEASE_NOTES: $RELEASE_NOTES"
           # Replace markdown links with confluence links
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g')
 
-          echo "Commit message: $RELEASE_NOTES"
+          echo "RELEASE_NOTES: $RELEASE_NOTES"
           # Replace @username with a link to the user's GitHub profile
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g')
 
-          echo "Commit message: $RELEASE_NOTES"
+          echo "RELEASE_NOTES: $RELEASE_NOTES"
           # Replace '\n' with '<br/>'
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/\\n/<br\/>/g')
   
