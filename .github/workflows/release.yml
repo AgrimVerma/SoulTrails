@@ -97,6 +97,7 @@ jobs:
             echo "Commit message: $COMMIT_MESSAGE"
             echo "Commit description: $COMMIT_DESCRIPTION"
             COMMIT_DETAILS="$COMMIT_DETAILS\n- $COMMIT_MESSAGE: $COMMIT_DESCRIPTION"
+            echo "Commit description: $COMMIT_DETAILS"
             if echo "$COMMIT_MESSAGE" | grep -E "feat:|break:"; then
               PUBLISH_DOCS=true
             fi
