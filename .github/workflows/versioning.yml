@@ -1,11 +1,13 @@
 name: Version and Confluence Update
 on:
-  workflow_dispatch:
-  push:
-    branches: [ master, add/gh-action-prod ]
+  workflow_run:
+    workflows: ["Deploy Production CGK"]
+    types:
+      - completed
 
 jobs:
   version-tag:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     name: Git Version Tagging
     runs-on: ubuntu-latest
     outputs:
@@ -138,6 +140,9 @@ jobs:
           # Replace '\n' with '<br/>'
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/\\n/<br\/>/g')
 
+          # Make "Full Changelog" bold
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/Full Changelog/**Full Changelog**/g')
+
           # Prepare the payload
           payload=$(jq -n \
           --arg spaceId "163842" \
@@ -145,32 +150,4 @@ jobs:
           --arg title "Release: ${{ needs.version-tag.outputs.version }}" \
           --arg parentId "163998" \
           --arg value "$RELEASE_NOTES" \
-          --arg gitCommitUrl "$GIT_COMMIT_URL" \
-          '{
-              "spaceId": $spaceId,
-              "status": $status,
-              "title": $title,
-              "parentId": $parentId,
-              "body": {
-              "representation": "wiki",
-              "value": $value
-              },
-              "gitCommitUrl": $gitCommitUrl
-          }'
-          )
-
-          echo "Payload: $payload"
-          response=$(curl --request POST \
-              --url 'https://agrim.atlassian.net/wiki/api/v2/pages' \
-              --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
-              --header 'Accept: application/json' \
-              --header 'Content-Type: application/json' \
-              --data "$payload")
-          echo "Response: $response"
-          pageId=$(echo "$response" | jq -r '.id')
-          echo "Page ID: $pageId"
-          if [ "$pageId" == "null" ]; then
-            echo "Failed to create page"
-            exit 1
-          fi
-          echo "pageId=$pageId" >> $GITHUB_ENV
+         
