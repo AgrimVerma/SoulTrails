@@ -1,6 +1,7 @@
 name: Version and Confluence Update
 on:
-  workflow_dispatch:
+  repository_dispatch:
+    types: [versioning_trigger]
 
 jobs:
   version-tag:
