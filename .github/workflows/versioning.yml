@@ -1,51 +1,163 @@
-name: Deploy Production CGK
+name: Version and Confluence Update
 on:
-  workflow_dispatch:
-  push:
-    branches: [ master, add/gh-action-prod ]
+  repository_dispatch:
+    types: [versioning_trigger]
 
 jobs:
-  build:
-    name: Release
+  version-tag:
+    name: Git Version Tagging
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish_docs: ${{ steps.check_commits.outputs.publish_docs }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
+      - uses: actions/checkout@v3
         with:
-          node-version: '20'
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
-      - name: Install dependencies
-        run: npm install
+      - name: Create Version Tagging
+        id: version
+        uses: codacy/git-version@2.7.0
+        with:
+          prefix: "v"
+          major-identifier: "break:"
+          minor-identifier: "feat:"
 
-      - name: Build and deploy
-        run: npm run deploy  # Replace with your actual deployment command
+      - name: Get Previous Tag
+        id: previous-tag
+        run: |
+          git fetch --tags
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0)
+          echo "PREVIOUS_TAG=$PREVIOUS_TAG" >> $GITHUB_ENV
 
-  trigger-versioning:
-    name: Trigger Versioning and Confluence Update
+      - name: Push Tagging
+        uses: actions/github-script@v5
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/${{ steps.version.outputs.version }}',
+              sha: context.sha
+            })
+
+      - name: Create release notes
+        uses: actions/github-script@v4.0.2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.request('POST /repos/${{github.repository}}/releases', {
+              tag_name: '${{ steps.version.outputs.version }}',
+              generate_release_notes: true
+            })
+
+      - name: Check commit messages for feat or break
+        id: check_commits
+        run: |
+          PUBLISH_DOCS=false
+          for COMMIT in $(git rev-list ${{ github.event.before }}..${{ github.sha }}); do
+            COMMIT_MESSAGE=$(git log -1 --pretty=%B $COMMIT)
+            echo "Commit message: $COMMIT_MESSAGE"
+            if echo "$COMMIT_MESSAGE" | grep -E "feat:|break:"; then
+              PUBLISH_DOCS=true
+              break
+            fi
+          done
+          echo "Publish docs to Confluence: $PUBLISH_DOCS"
+          echo "::set-output name=publish_docs::$PUBLISH_DOCS"
+
+  create-confluence-page:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [ version-tag ]
+    if: needs.version-tag.outputs.publish_docs == 'true'
     steps:
-      - name: Check if rerun
-        id: check-rerun
-        run: |
-          if [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
-            echo "This is a fresh run"
-            echo "rerun=false" >> $GITHUB_ENV
-          else
-            echo "This is a rerun"
-            echo "rerun=true" >> $GITHUB_ENV
-          fi
-          echo "::set-output name=rerun::${{ env.rerun }}"
+      - name: Get Release
+        id: get-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ needs.version-tag.outputs.version }}';
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: '${{ github.repository_owner }}',
+              repo: '${{ github.event.repository.name }}',
+              tag: tag
+            });
+            if (!release || !release.data.body) {
+                console.error('Invalid release');
+                return;
+            }
+            console.log(release.data.body);
+            return {
+                body: release.data.body,
+                url: `https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/releases/tag/${tag}`
+            };
 
-      - name: Trigger Versioning and Confluence Workflow
-        if: steps.check-rerun.outputs.rerun == 'false'
+      - name: Post Release Notes to Confluence
+        id: post_to_confluence
+        shell: bash
+        env:
+          RELEASE_NOTES: ${{ fromJSON(steps.get-release.outputs.result).body }}
+          RELEASE_URL: ${{ fromJSON(steps.get-release.outputs.result).url }}
         run: |
-          curl -X POST \
-          -H "Accept: application/vnd.github+json" \
-          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-          -H "Content-Type: application/json" \
-          --data '{"event_type":"versioning_trigger"}' \
-          https://api.github.com/repos/${{ github.repository }}/dispatches
+          # Extract the git commit URL
+          GIT_COMMIT_URL=$(echo -e "${RELEASE_NOTES}" | grep -oP 'https://github\.com/[^\s]+')
+
+          # Add additional line before the content
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}"
+
+          # Remove '##' from RELEASE_NOTES
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
+
+          # Remove extra HTML
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/<[^>]*>//g')
+
+          # Replace markdown links with confluence links
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g')
+
+          # Replace @username with a link to the user's GitHub profile
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g')
+
+          # Replace '\n' with '<br/>'
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/\\n/<br\/>/g')
+
+          # Make "Full Changelog" bold
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/Full Changelog/**Full Changelog**/g')
+
+          # Prepare the payload
+          payload=$(jq -n \
+          --arg spaceId "163842" \
+          --arg status "current" \
+          --arg title "Release: ${{ needs.version-tag.outputs.version }}" \
+          --arg parentId "163998" \
+          --arg value "$RELEASE_NOTES" \
+          --arg gitCommitUrl "$GIT_COMMIT_URL" \
+          '{
+              "spaceId": $spaceId,
+              "status": $status,
+              "title": $title,
+              "parentId": $parentId,
+              "body": {
+              "representation": "wiki",
+              "value": $value
+              },
+              "gitCommitUrl": $gitCommitUrl
+          }'
+          )
+
+          echo "Payload: $payload"
+          response=$(curl --request POST \
+              --url 'https://agrim.atlassian.net/wiki/api/v2/pages' \
+              --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
+              --header 'Accept: application/json' \
+              --header 'Content-Type: application/json' \
+              --data "$payload")
+          echo "Response: $response"
+          pageId=$(echo "$response" | jq -r '.id')
+          echo "Page ID: $pageId"
+          if [ "$pageId" == "null" ]; then
+            echo "Failed to create page"
+            exit 1
+          fi
+          echo "pageId=$pageId" >> $GITHUB_ENV
