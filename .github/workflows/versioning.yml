@@ -1,11 +1,13 @@
 name: Version and Confluence Update
 on:
-  workflow_dispatch:
-  push:
-    branches: [ master, add/gh-action-prod ]
+  workflow_run:
+    workflows: ["Deploy Production CGK"]
+    types:
+      - completed
 
 jobs:
   version-tag:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     name: Git Version Tagging
     runs-on: ubuntu-latest
     outputs:
@@ -137,6 +139,9 @@ jobs:
 
           # Replace '\n' with '<br/>'
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/\\n/<br\/>/g')
+
+          # Make "Full Changelog" bold
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/Full Changelog/**Full Changelog**/g')
 
           # Prepare the payload
           payload=$(jq -n \
