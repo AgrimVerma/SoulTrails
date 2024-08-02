@@ -98,7 +98,7 @@ jobs:
 
       - name: Send Release Notes to Confluence
         run: |
-          AUTH=$(echo -n "${{ secrets.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}" | base64)
+          AUTH=$(echo -n "${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}" | base64)
           curl -X POST \
           -H "Content-Type: application/json" \
           -H "Authorization: Basic $AUTH" \
