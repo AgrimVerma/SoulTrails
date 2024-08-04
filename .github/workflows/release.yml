@@ -96,17 +96,22 @@ jobs:
             COMMIT_DESCRIPTION=$(git log -1 --pretty=%b $COMMIT)
             echo "Commit message: $COMMIT_MESSAGE"
             echo "Commit description: $COMMIT_DESCRIPTION"
+            
+            # Properly append the commit details with a newline
             COMMIT_DETAILS="${COMMIT_DETAILS}\n- ${COMMIT_MESSAGE}: ${COMMIT_DESCRIPTION}"
-            echo "Commit details: $COMMIT_DETAILS"
+            
             if echo "$COMMIT_MESSAGE" | grep -E "feat:|break:"; then
               PUBLISH_DOCS=true
             fi
           done
+      
+          # Trim leading newlines
           COMMIT_DETAILS=$(echo -e "$COMMIT_DETAILS" | sed 's/^\\n//')
-          echo "Commit details: $COMMIT_DETAILS"
+      
           echo "Publish docs to Confluence: $PUBLISH_DOCS"
           echo "::set-output name=publish_docs::$PUBLISH_DOCS"
           echo "::set-output name=commit_details::$COMMIT_DETAILS"
+        shell: bash
 
   create-confluence-page:
     runs-on: ubuntu-latest
