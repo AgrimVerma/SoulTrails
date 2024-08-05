@@ -248,12 +248,13 @@ jobs:
           current_version=${{ env.current_version }}
           title="${{ env.title }}"
           new_fix_notes="Commit Details:\n${{ needs.version-tag.outputs.commit_details }}"
-  
-          # Process new_fix_notes to ensure correct formatting for Confluence
-          new_fix_notes=$(echo "$new_fix_notes" | sed 's/\\:/:/g' | sed 's/\n/<br\/>/g')
           
           # Combine existing content with new fix notes
           updated_content="${existing_content}<br/><br/>${new_fix_notes}"
+
+          
+          # Process new_fix_notes to ensure correct formatting for Confluence
+          updated_content=$(echo "$updated_content" | sed 's/\\:/:/g' | sed 's/\n/<br\/>/g')
   
           # Prepare the payload with jq
           payload=$(jq -n \
