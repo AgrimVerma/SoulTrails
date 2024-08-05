@@ -246,13 +246,6 @@ jobs:
           title=${{ env.title }}
           new_fix_notes="Commit Details:\n${{ needs.version-tag.outputs.commit_details }}"
 
-          # Print all variables
-          echo "Existing Content:"
-          echo "${existing_content}"
-          echo "Current Version: ${current_version}"
-          echo "Title: ${title}"
-          echo "New Fix Notes (raw): ${new_fix_notes}"
-
           # Remove backslashes before colons in commit details
           new_fix_notes=$(echo "$new_fix_notes" | sed 's/\\:/:/g')
 
@@ -265,18 +258,13 @@ jobs:
           # Append new_fix_notes to existing_content
           updated_content="${existing_content}<br/><br/>${new_fix_notes}"
 
-          # Print updated content
-          echo "Updated Content:"
-          echo "${updated_content}"
-
           # Prepare the payload
           payload=$(jq -n \
           --arg value "$updated_content" \
           --arg title "$title" \
-          --argjson version $((current_version + 1)) \
           '{
               "version": {
-                "number": $version
+                "number": $((current_version + 1))
               },
               "title": $title,
               "type": "page",
@@ -288,9 +276,6 @@ jobs:
               }
           }'
           )
-
-          # Print payload
-          echo "Payload: $payload"
 
           response=$(curl --request PUT \
               --url 'https://agrim.atlassian.net/wiki/rest/api/content/1146899' \
