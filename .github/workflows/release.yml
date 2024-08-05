@@ -162,7 +162,7 @@ jobs:
           echo "Release notes: ${RELEASE_NOTES}"
           echo "Commit details: ${COMMIT_DETAILS}"
           # Add additional line before the content
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${COMMIT_DETAILS}"
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}"
 
           # Remove '##' from RELEASE_NOTES
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
