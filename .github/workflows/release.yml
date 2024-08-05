@@ -29,7 +29,6 @@ jobs:
       publish_docs: ${{ steps.check_commits.outputs.publish_docs }}
       commit_details: ${{ steps.check_commits.outputs.commit_details }}
       append_notes: ${{ steps.check_commits.outputs.append_notes }}
-      pr_description: ${{ steps.get_pr_description.outputs.pr_description }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -118,37 +117,11 @@ jobs:
           echo "Publish docs to Confluence: $PUBLISH_DOCS"
           echo "Append notes to Confluence: $APPEND_NOTES"
           echo "Commit details: $COMMIT_DETAILS"
-          echo github.event_name
 
           echo "::set-output name=publish_docs::$PUBLISH_DOCS"
           echo "::set-output name=append_notes::$APPEND_NOTES"
           echo "::set-output name=commit_details::$(echo "$COMMIT_DETAILS" | sed ':a;N;$!ba;s/\n/\\n/g')"
         shell: bash
-
-      - name: Get PR Description
-        id: get_pr_description
-        uses: actions/github-script@v5
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const pr_number = context.payload.pull_request ? context.payload.pull_request.number : null;
-            if (pr_number) {
-              const { data: pr } = await github.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: pr_number
-              });
-              const pr_description = pr.body || '';
-              console.log(`PR Description: ${pr_description}`);
-              return {
-                pr_description
-              };
-            } else {
-              console.log('No PR description available');
-              return {
-                pr_description: ''
-              };
-            }
 
   create-confluence-page:
     runs-on: ubuntu-latest
@@ -183,14 +156,16 @@ jobs:
           RELEASE_NOTES: ${{ fromJSON(steps.get-release.outputs.result).body }}
           RELEASE_URL: ${{ fromJSON(steps.get-release.outputs.result).url }}
           COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
-          PR_DESCRIPTION: ${{ needs.version-tag.outputs.pr_description }}
         run: |
           echo "Release url: ${RELEASE_URL}"
           echo "Release notes: ${RELEASE_NOTES}"
           echo "Commit details: ${COMMIT_DETAILS}"
-          echo "PR description: ${PR_DESCRIPTION}"
+
+          # Remove backslashes before colons in commit details
+          COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
+          
           # Add additional line before the content
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nPR Description:\n${PR_DESCRIPTION}\n\nCommit Details:\n${COMMIT_DETAILS}"
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\nCommit Details:\n${COMMIT_DETAILS}"
 
           # Remove '##' from RELEASE_NOTES
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
@@ -254,30 +229,33 @@ jobs:
               --url 'https://agrim.atlassian.net/wiki/rest/api/content/1146899?expand=body.storage,version' \
               --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
               --header 'Accept: application/json')
-          echo "Response: $response"
+          
+          # Extract necessary data from the response
           existing_content=$(echo "$response" | jq -r '.body.storage.value')
           current_version=$(echo "$response" | jq -r '.version.number')
           title=$(echo "$response" | jq -r '.title')
+          
+          # Pass the extracted data as environment variables
           echo "existing_content<<EOF" >> $GITHUB_ENV
           echo "$existing_content" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
           echo "current_version=$current_version" >> $GITHUB_ENV
           echo "title=$title" >> $GITHUB_ENV
-
+  
       - name: Append Fix Notes to Confluence
         run: |
           existing_content="${{ env.existing_content }}"
           current_version=${{ env.current_version }}
-          title=${{ env.title }}
+          title="${{ env.title }}"
           new_fix_notes="Commit Details:\n${{ needs.version-tag.outputs.commit_details }}"
-
-          # Convert new_fix_notes to Confluence format
-          new_fix_notes=$(echo -e "$new_fix_notes" | sed 's/\n/<br\/>/g')
-
-          # Append new_fix_notes to existing_content
+  
+          # Process new_fix_notes to ensure correct formatting for Confluence
+          new_fix_notes=$(echo "$new_fix_notes" | sed 's/\\:/:/g' | sed 's/\n/<br\/>/g')
+          
+          # Combine existing content with new fix notes
           updated_content="${existing_content}<br/><br/>${new_fix_notes}"
-
-          # Prepare the payload
+  
+          # Prepare the payload with jq
           payload=$(jq -n \
           --arg value "$updated_content" \
           --arg title "$title" \
@@ -294,13 +272,14 @@ jobs:
                   "representation": "storage"
                 }
               }
-          }'
-          )
-
-          echo "Payload: $payload"
+          }')
+  
+          # Send the payload to update the Confluence page
           response=$(curl --request PUT \
               --url 'https://agrim.atlassian.net/wiki/rest/api/content/1146899' \
               --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
               --header 'Content-Type: application/json' \
               --data "$payload")
+          
+          # Output the response for debugging
           echo "Response: $response"
