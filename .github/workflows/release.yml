@@ -279,23 +279,23 @@ jobs:
           # Add additional line before the content
           RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${new_fix_notes}"
 
-          # Combine existing content with new fix notes
-          updated_content="${existing_content}<br/><br/>${RELEASE_NOTES}"
-          
           # Remove '##' from RELEASE_NOTES
-          updated_content=$(echo -e "${updated_content}" | sed 's/## //g')
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
 
           # Remove extra HTML
-          updated_content=$(echo -e "${updated_content}" | sed -r 's/<[^>]*>//g')
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/<[^>]*>//g')
 
           # Replace markdown links with confluence links
-          updated_content=$(echo -e "${updated_content}" | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g')
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g')
 
           # Replace @username with a link to the user's GitHub profile
-          updated_content=$(echo -e "${updated_content}" | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g')
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g')
 
           # Replace '\n' with '<br/>'
-          updated_content=$(echo -e "${updated_content}" | sed 's/\\n/<br\/>/g')
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/\\n/<br\/>/g')
+
+          # Combine existing content with new fix notes
+          updated_content="${existing_content}<br/><br/>${RELEASE_NOTES}"
           
           # Prepare the payload with jq
           payload=$(jq -n \
