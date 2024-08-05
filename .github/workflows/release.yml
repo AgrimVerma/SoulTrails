@@ -98,7 +98,6 @@ jobs:
             COMMIT_DESCRIPTION=$(git log -1 --pretty=%b $COMMIT)
             
             # Properly append the commit details with a newline
-            echo "Commit details: $COMMIT_DETAILS"
             COMMIT_DETAILS="${COMMIT_DETAILS}\n- ${COMMIT_MESSAGE}: ${COMMIT_DESCRIPTION}"
             
             if echo "$COMMIT_MESSAGE" | grep -E "feat:|break:"; then
@@ -109,6 +108,9 @@ jobs:
               APPEND_NOTES=true
             fi
           done
+
+          # Remove trailing newlines from COMMIT_DETAILS
+          COMMIT_DETAILS=$(echo -e "$COMMIT_DETAILS" | sed '/^$/d')
       
           echo "Publish docs to Confluence: $PUBLISH_DOCS"
           echo "Append notes to Confluence: $APPEND_NOTES"
@@ -158,23 +160,18 @@ jobs:
           # Add additional line before the content
           RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}"
 
-          echo "RELEASE_NOTES: $RELEASE_NOTES"
           # Remove '##' from RELEASE_NOTES
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
 
-          echo "RELEASE_NOTES: $RELEASE_NOTES"
           # Remove extra HTML
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/<[^>]*>//g')
 
-          echo "RELEASE_NOTES: $RELEASE_NOTES"
           # Replace markdown links with confluence links
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g')
 
-          echo "RELEASE_NOTES: $RELEASE_NOTES"
           # Replace @username with a link to the user's GitHub profile
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g')
 
-          echo "RELEASE_NOTES: $RELEASE_NOTES"
           # Replace '\n' with '<br/>'
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/\\n/<br\/>/g')
   
