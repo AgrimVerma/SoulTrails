@@ -78,47 +78,36 @@ jobs:
 
       - name: Create release notes
         if: steps.check_rerun.outputs.rerun == 'false'
-        uses: actions/github-script@v4.0.2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            await github.request('POST /repos/${{github.repository}}/releases', {
-              tag_name: '${{ steps.version.outputs.version }}',
-              generate_release_notes: true
-            })
-
-      - name: Check commit messages and descriptions for feat, break, or fix
-        id: check_commits
+        id: generate-release-notes
         run: |
           PUBLISH_DOCS=false
           APPEND_NOTES=false
-          COMMIT_DETAILS=""
+          RELEASE_NOTES=""
           for COMMIT in $(git rev-list ${{ github.event.before }}..${{ github.sha }}); do
-            COMMIT_MESSAGE=$(git log -1 --pretty=%B $COMMIT)
+            COMMIT_MESSAGE=$(git log -1 --pretty=%s $COMMIT)
             COMMIT_DESCRIPTION=$(git log -1 --pretty=%b $COMMIT)
-            
-            # Properly append the commit details with a newline
-            COMMIT_DETAILS="${COMMIT_DETAILS}\n- ${COMMIT_MESSAGE}: ${COMMIT_DESCRIPTION}"
-            
+            COMMIT_DETAILS="${COMMIT_MESSAGE}: ${COMMIT_DESCRIPTION}"
+      
             if echo "$COMMIT_MESSAGE" | grep -E "feat:|break:"; then
               PUBLISH_DOCS=true
             fi
-
+      
             if echo "$COMMIT_MESSAGE" | grep -E "fix:"; then
               APPEND_NOTES=true
             fi
-          done
-
-          # Remove trailing newlines from COMMIT_DETAILS
-          COMMIT_DETAILS=$(echo -e "$COMMIT_DETAILS" | sed '/^$/d')
       
-          echo "Publish docs to Confluence: $PUBLISH_DOCS"
-          echo "Append notes to Confluence: $APPEND_NOTES"
-          echo "Commit details: $COMMIT_DETAILS"
+            # Append commit details to release notes
+            RELEASE_NOTES="${RELEASE_NOTES}\n- ${COMMIT_DETAILS}"
+          done
+      
+          # Remove trailing newlines from RELEASE_NOTES
+          RELEASE_NOTES=$(echo -e "$RELEASE_NOTES" | sed '/^$/d')
+          
+          echo "Release Notes: $RELEASE_NOTES"
+          echo "::set-output name=release_notes::$RELEASE_NOTES"
           echo "::set-output name=publish_docs::$PUBLISH_DOCS"
           echo "::set-output name=append_notes::$APPEND_NOTES"
-          echo "::set-output name=commit_details::$COMMIT_DETAILS"
-        shell: bash
+
 
   create-confluence-page:
     runs-on: ubuntu-latest
@@ -152,13 +141,11 @@ jobs:
         env:
           RELEASE_NOTES: ${{ fromJSON(steps.get-release.outputs.result).body }}
           RELEASE_URL: ${{ fromJSON(steps.get-release.outputs.result).url }}
-          COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
         run: |
           echo "Release url: ${RELEASE_URL}"
           echo "Release notes: ${RELEASE_NOTES}"
-          echo "Commit details: ${COMMIT_DETAILS}"
           # Add additional line before the content
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}"
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}"
 
           # Remove '##' from RELEASE_NOTES
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
