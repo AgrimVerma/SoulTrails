@@ -119,11 +119,9 @@ jobs:
           echo "Append notes to Confluence: $APPEND_NOTES"
           echo "Commit details: $COMMIT_DETAILS"
 
-          echo "publish_docs=$PUBLISH_DOCS" >> $GITHUB_ENV
-          echo "append_notes=$APPEND_NOTES" >> $GITHUB_ENV
-          echo "commit_details<<EOF" >> $GITHUB_ENV
-          echo "$COMMIT_DETAILS" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          echo "::set-output name=publish_docs::$PUBLISH_DOCS"
+          echo "::set-output name=append_notes::$APPEND_NOTES"
+          echo "::set-output name=commit_details::$(echo "$COMMIT_DETAILS" | sed ':a;N;$!ba;s/\n/\\n/g')"
         shell: bash
 
   create-confluence-page:
