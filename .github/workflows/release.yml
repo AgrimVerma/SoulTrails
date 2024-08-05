@@ -243,6 +243,9 @@ jobs:
           echo "title=$title" >> $GITHUB_ENV
   
       - name: Append Fix Notes to Confluence
+        env:
+          RELEASE_NOTES: ${{ fromJSON(steps.get-release.outputs.result).body }}
+          RELEASE_URL: ${{ fromJSON(steps.get-release.outputs.result).url }}
         run: |
           existing_content="${{ env.existing_content }}"
           current_version=${{ env.current_version }}
@@ -252,9 +255,8 @@ jobs:
           # Combine existing content with new fix notes
           updated_content="${existing_content}<br/><br/>${new_fix_notes}"
 
-          
-          # Process new_fix_notes to ensure correct formatting for Confluence
-          updated_content=$(echo "$updated_content" | sed 's/\\:/:/g' | sed 's/\n/<br\/>/g')
+          # Add additional line before the content
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${updated_content}"
   
           # Prepare the payload with jq
           payload=$(jq -n \
