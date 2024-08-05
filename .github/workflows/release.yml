@@ -123,42 +123,27 @@ jobs:
           echo "::set-output name=commit_details::$(echo "$COMMIT_DETAILS" | sed ':a;N;$!ba;s/\n/\\n/g')"
         shell: bash
 
-  fetch-pr-description:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Find Merged Pull Request
-        id: find_pr
-        run: |
-          COMMIT_SHA=$(git rev-parse HEAD)
-          PR_DATA=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                    "https://api.github.com/search/issues?q=repo:${{ github.repository }}+type:pr+is:closed+merged:${COMMIT_SHA}")
-          PR_NUMBER=$(echo "$PR_DATA" | jq -r '.items[0].number')
-          echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_ENV
-
-      - name: Get PR Description
-        id: get_pr_description
-        run: |
-          if [ -n "${{ env.PR_NUMBER }}" ]; then
-            DESCRIPTION=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                          "https://api.github.com/repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }}" | jq -r '.body')
-            echo "PR_DESCRIPTION=${DESCRIPTION}" >> $GITHUB_ENV
-          else
-            echo "No PR found for the merged commit."
-            exit 1
-          fi
-
-      - name: Display PR Description
-        run: |
-          echo "PR Description: $PR_DESCRIPTION"
-
   create-confluence-page:
     runs-on: ubuntu-latest
     needs: [ build, version-tag ]
     if: needs.version-tag.outputs.publish_docs == 'true'
     steps:
+      - uses: actions/github-script@v6
+        id: get_pr_data
+        with:
+          script: |
+              return (
+                await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                  commit_sha: context.sha,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                })
+              ).data[0];
+      - name: Pull Request data
+        run: |
+          echo '${{ fromJson(steps.get_pr_data.outputs.result).number }}'
+          echo '${{ fromJson(steps.get_pr_data.outputs.result).title }}'
+          
       - name: Get Release
         id: get-release
         uses: actions/github-script@v7
