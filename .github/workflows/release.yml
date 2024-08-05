@@ -168,7 +168,7 @@ jobs:
         env:
           RELEASE_NOTES: ${{ fromJSON(steps.get-release.outputs.result).body }}
           RELEASE_URL: ${{ fromJSON(steps.get-release.outputs.result).url }}
-          PR_DESCRIPTION: ${{ fromJSON(steps.get_pr_data.outputs.result).body }}
+          PR_DESCRIPTION: ${{ fromJson(steps.get_pr_data.outputs.result).body }}
           COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
         run: |
           echo "Release url: ${RELEASE_URL}"
