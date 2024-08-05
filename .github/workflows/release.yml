@@ -256,7 +256,7 @@ jobs:
           echo "New Fix Notes (formatted): ${new_fix_notes}"
 
           # Append new_fix_notes to existing_content
-          updated_content="${existing_content}<br/><br/>${new_fix_notes}"
+          updated_content="${new_fix_notes}"
 
           # Prepare the payload
           payload=$(jq -n \
