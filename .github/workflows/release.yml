@@ -28,6 +28,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       publish_docs: ${{ steps.check_commits.outputs.publish_docs }}
       commit_details: ${{ steps.check_commits.outputs.commit_details }}
+      append_notes: ${{ steps.check_commits.outputs.append_notes }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -86,10 +87,11 @@ jobs:
               generate_release_notes: true
             })
 
-      - name: Check commit messages and descriptions for feat or break
+      - name: Check commit messages and descriptions for feat, break, or fix
         id: check_commits
         run: |
           PUBLISH_DOCS=false
+          APPEND_NOTES=false
           COMMIT_DETAILS=""
           for COMMIT in $(git rev-list ${{ github.event.before }}..${{ github.sha }}); do
             COMMIT_MESSAGE=$(git log -1 --pretty=%B $COMMIT)
@@ -103,13 +105,19 @@ jobs:
             if echo "$COMMIT_MESSAGE" | grep -E "feat:|break:"; then
               PUBLISH_DOCS=true
             fi
+
+            if echo "$COMMIT_MESSAGE" | grep -E "fix:"; then
+              APPEND_NOTES=true
+            fi
           done
       
           # Trim leading newlines
           COMMIT_DETAILS=$(echo -e "$COMMIT_DETAILS" | sed 's/^\\n//')
       
           echo "Publish docs to Confluence: $PUBLISH_DOCS"
+          echo "Append notes to Confluence: $APPEND_NOTES"
           echo "::set-output name=publish_docs::$PUBLISH_DOCS"
+          echo "::set-output name=append_notes::$APPEND_NOTES"
           echo "::set-output name=commit_details::$COMMIT_DETAILS"
         shell: bash
 
@@ -207,3 +215,67 @@ jobs:
             exit 1
           fi
           echo "pageId=$pageId" >> $GITHUB_ENV
+
+  append-fix-notes:
+    runs-on: ubuntu-latest
+    needs: [ build, version-tag ]
+    if: needs.version-tag.outputs.append_notes == 'true'
+    steps:
+      - name: Get Existing Confluence Page
+        id: get_confluence_page
+        run: |
+          response=$(curl --request GET \
+              --url 'https://agrim.atlassian.net/wiki/rest/api/content/1146899?expand=body.storage,version' \
+              --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
+              --header 'Accept: application/json')
+          echo "Response: $response"
+          existing_content=$(echo "$response" | jq -r '.body.storage.value')
+          current_version=$(echo "$response" | jq -r '.version.number')
+          title=$(echo "$response" | jq -r '.title')
+          echo "Existing content: $existing_content"
+          echo "Current version: $current_version"
+          echo "Title: $title"
+          echo "existing_content=$existing_content" >> $GITHUB_ENV
+          echo "current_version=$current_version" >> $GITHUB_ENV
+          echo "title=$title" >> $GITHUB_ENV
+
+      - name: Append Fix Notes to Confluence
+        run: |
+          existing_content=${{ env.existing_content }}
+          current_version=${{ env.current_version }}
+          title=${{ env.title }}
+          new_fix_notes="Commit Details:\n${{ needs.version-tag.outputs.commit_details }}"
+
+          # Convert new_fix_notes to Confluence format
+          new_fix_notes=$(echo -e "$new_fix_notes" | sed 's/\n/<br\/>/g')
+
+          # Append new_fix_notes to existing_content
+          updated_content="${existing_content}<br/><br/>${new_fix_notes}"
+
+          # Prepare the payload
+          payload=$(jq -n \
+          --arg value "$updated_content" \
+          --arg title "$title" \
+          --argjson version $((current_version + 1)) \
+          '{
+              "version": {
+                "number": $version
+              },
+              "title": $title,
+              "type": "page",
+              "body": {
+                "storage": {
+                  "value": $value,
+                  "representation": "storage"
+                }
+              }
+          }'
+          )
+
+          echo "Payload: $payload"
+          response=$(curl --request PUT \
+              --url 'https://agrim.atlassian.net/wiki/rest/api/content/1146899' \
+              --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
+              --header 'Content-Type: application/json' \
+              --data "$payload")
+          echo "Response: $response"
