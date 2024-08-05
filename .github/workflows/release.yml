@@ -232,16 +232,15 @@ jobs:
           existing_content=$(echo "$response" | jq -r '.body.storage.value')
           current_version=$(echo "$response" | jq -r '.version.number')
           title=$(echo "$response" | jq -r '.title')
-          echo "Existing content: $existing_content"
-          echo "Current version: $current_version"
-          echo "Title: $title"
-          echo "existing_content=$existing_content" >> $GITHUB_ENV
+          echo "existing_content<<EOF" >> $GITHUB_ENV
+          echo "$existing_content" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
           echo "current_version=$current_version" >> $GITHUB_ENV
           echo "title=$title" >> $GITHUB_ENV
 
       - name: Append Fix Notes to Confluence
         run: |
-          existing_content=${{ env.existing_content }}
+          existing_content="${{ env.existing_content }}"
           current_version=${{ env.current_version }}
           title=${{ env.title }}
           new_fix_notes="Commit Details:\n${{ needs.version-tag.outputs.commit_details }}"
@@ -279,3 +278,4 @@ jobs:
               --header 'Content-Type: application/json' \
               --data "$payload")
           echo "Response: $response"
+          
