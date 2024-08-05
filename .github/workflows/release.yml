@@ -117,7 +117,7 @@ jobs:
           echo "Commit details: $COMMIT_DETAILS"
           echo "::set-output name=publish_docs::$PUBLISH_DOCS"
           echo "::set-output name=append_notes::$APPEND_NOTES"
-          echo "::set-output name=commit_details::$COMMIT_DETAILS"
+          echo "{commit_details}={$COMMIT_DETAILS}" >> $GITHUB_OUTPUT
         shell: bash
 
 
