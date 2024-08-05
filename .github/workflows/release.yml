@@ -165,7 +165,7 @@ jobs:
           COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
           
           # Add additional line before the content
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\nCommit Details:\n${COMMIT_DETAILS}"
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}"
 
           # Remove '##' from RELEASE_NOTES
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
@@ -226,7 +226,7 @@ jobs:
         id: get_confluence_page
         run: |
           response=$(curl --request GET \
-              --url 'https://agrim.atlassian.net/wiki/rest/api/content/1146899?expand=body.storage,version' \
+              --url 'https://agrim.atlassian.net/wiki/rest/api/content/2490372?expand=body.storage,version' \
               --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
               --header 'Accept: application/json')
           
@@ -276,7 +276,7 @@ jobs:
   
           # Send the payload to update the Confluence page
           response=$(curl --request PUT \
-              --url 'https://agrim.atlassian.net/wiki/rest/api/content/1146899' \
+              --url 'https://agrim.atlassian.net/wiki/rest/api/content/2490372' \
               --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
               --header 'Content-Type: application/json' \
               --data "$payload")
