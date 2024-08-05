@@ -96,10 +96,9 @@ jobs:
           for COMMIT in $(git rev-list ${{ github.event.before }}..${{ github.sha }}); do
             COMMIT_MESSAGE=$(git log -1 --pretty=%B $COMMIT)
             COMMIT_DESCRIPTION=$(git log -1 --pretty=%b $COMMIT)
-            echo "Commit message: $COMMIT_MESSAGE"
-            echo "Commit description: $COMMIT_DESCRIPTION"
             
             # Properly append the commit details with a newline
+            echo "Commit details: $COMMIT_DETAILS"
             COMMIT_DETAILS="${COMMIT_DETAILS}\n- ${COMMIT_MESSAGE}: ${COMMIT_DESCRIPTION}"
             
             if echo "$COMMIT_MESSAGE" | grep -E "feat:|break:"; then
@@ -110,9 +109,6 @@ jobs:
               APPEND_NOTES=true
             fi
           done
-      
-          # Trim leading newlines
-          COMMIT_DETAILS=$(echo -e "$COMMIT_DETAILS" | sed 's/^\\n//')
       
           echo "Publish docs to Confluence: $PUBLISH_DOCS"
           echo "Append notes to Confluence: $APPEND_NOTES"
