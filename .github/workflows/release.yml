@@ -140,7 +140,7 @@ jobs:
                 })
               ).data[0];
       - name: Pull Request data
-        run: echo '${{steps.get_issue_number.outputs.result}}'
+        run: echo '${{steps.get_pr_data.outputs.result}}'
           
       - name: Get Release
         id: get-release
