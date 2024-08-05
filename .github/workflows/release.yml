@@ -94,7 +94,7 @@ jobs:
           APPEND_NOTES=false
           COMMIT_DETAILS=""
           for COMMIT in $(git rev-list ${{ github.event.before }}..${{ github.sha }}); do
-            COMMIT_MESSAGE=$(git log -1 --pretty=%B $COMMIT)
+            COMMIT_MESSAGE=$(git log -1 --pretty=%s $COMMIT)
             COMMIT_DESCRIPTION=$(git log -1 --pretty=%b $COMMIT)
             
             # Properly append the commit details with a newline
@@ -103,21 +103,27 @@ jobs:
             if echo "$COMMIT_MESSAGE" | grep -E "feat:|break:"; then
               PUBLISH_DOCS=true
             fi
-
+          
             if echo "$COMMIT_MESSAGE" | grep -E "fix:"; then
               APPEND_NOTES=true
             fi
           done
-
+          
           # Remove trailing newlines from COMMIT_DETAILS
           COMMIT_DETAILS=$(echo -e "$COMMIT_DETAILS" | sed '/^$/d')
-      
+          
+          # Escape special characters for environment file
+          COMMIT_DETAILS=$(echo -e "$COMMIT_DETAILS" | sed 's/,/\\,/g' | sed 's/:/\\:/g')
+
           echo "Publish docs to Confluence: $PUBLISH_DOCS"
           echo "Append notes to Confluence: $APPEND_NOTES"
           echo "Commit details: $COMMIT_DETAILS"
+
           echo "publish_docs=$PUBLISH_DOCS" >> $GITHUB_ENV
           echo "append_notes=$APPEND_NOTES" >> $GITHUB_ENV
-          echo "commit_details=$COMMIT_DETAILS" >> $GITHUB_ENV
+          echo "commit_details<<EOF" >> $GITHUB_ENV
+          echo "$COMMIT_DETAILS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
         shell: bash
 
   create-confluence-page:
