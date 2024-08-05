@@ -128,7 +128,8 @@ jobs:
     needs: [ build, version-tag ]
     if: needs.version-tag.outputs.publish_docs == 'true'
     steps:
-      - uses: actions/github-script@v6
+      - name: Get PR description
+        uses: actions/github-script@v6
         id: get_pr_data
         with:
           script: |
@@ -139,8 +140,6 @@ jobs:
                   repo: context.repo.repo,
                 })
               ).data[0];
-      - name: Pull Request data
-        run: echo '${{steps.get_pr_data.outputs.result}}'
           
       - name: Get Release
         id: get-release
@@ -169,17 +168,19 @@ jobs:
         env:
           RELEASE_NOTES: ${{ fromJSON(steps.get-release.outputs.result).body }}
           RELEASE_URL: ${{ fromJSON(steps.get-release.outputs.result).url }}
+          PR_DESCRIPTION: ${{ fromJSON(steps.get_pr_data.outputs.result).body }}
           COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
         run: |
           echo "Release url: ${RELEASE_URL}"
           echo "Release notes: ${RELEASE_NOTES}"
           echo "Commit details: ${COMMIT_DETAILS}"
+          echo "PR Description: ${PR_DESCRIPTION}"
 
           # Remove backslashes before colons in commit details
           COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
           
           # Add additional line before the content
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}"
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}\n\nPR Description:\n${PR_DESCRIPTION}"
 
           # Remove '##' from RELEASE_NOTES
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
