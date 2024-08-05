@@ -230,9 +230,9 @@ jobs:
               --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
               --header 'Accept: application/json')
           echo "Response: $response"
+          title=$(echo "$response" | jq -r '.title')
           existing_content=$(echo "$response" | jq -r '.body.storage.value')
           current_version=$(echo "$response" | jq -r '.version.number')
-          title=$(echo "$response" | jq -r '.title')
           echo "existing_content<<EOF" >> $GITHUB_ENV
           echo "$existing_content" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
