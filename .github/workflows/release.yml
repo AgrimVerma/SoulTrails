@@ -222,6 +222,27 @@ jobs:
     needs: [ build, version-tag ]
     if: needs.version-tag.outputs.append_notes == 'true'
     steps:
+      - name: Get Release
+        id: get-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ needs.version-tag.outputs.version }}';
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: '${{ github.repository_owner }}',
+              repo: '${{ github.event.repository.name }}',
+              tag: tag
+            });
+            if (!release || !release.data.body) {
+                console.error('Invalid release');
+                return;
+            }
+            console.log(release.data.body);
+            return {
+                body: release.data.body,
+                url: `https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/releases/tag/${tag}`
+            };
+            
       - name: Get Existing Confluence Page
         id: get_confluence_page
         run: |
