@@ -7,7 +7,6 @@ name: Deploy Production CGK
 
 jobs:
   build:
-    name: Release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -22,13 +21,12 @@ jobs:
         run: node --version
 
   version-tag:
-    name: Git Version Tagging
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
       publish_docs: ${{ steps.check_commits.outputs.publish_docs }}
-      commit_details: ${{ steps.check_commits.outputs.commit_details }}
       append_notes: ${{ steps.check_commits.outputs.append_notes }}
+      commit_details: ${{ steps.check_commits.outputs.commit_details }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -87,7 +85,7 @@ jobs:
               generate_release_notes: true
             })
 
-      - name: Check commit messages and descriptions for feat, break, or fix
+      - name: Check commit messages for keywords
         id: check_commits
         run: |
           PUBLISH_DOCS=false
@@ -95,29 +93,15 @@ jobs:
           COMMIT_DETAILS=""
           for COMMIT in $(git rev-list ${{ github.event.before }}..${{ github.sha }}); do
             COMMIT_MESSAGE=$(git log -1 --pretty=%s $COMMIT)
-            
-            # Properly append the commit details with a newline
             COMMIT_DETAILS="${COMMIT_DETAILS}\n- ${COMMIT_MESSAGE}"
-            
             if echo "$COMMIT_MESSAGE" | grep -E "feat:|break:"; then
               PUBLISH_DOCS=true
             fi
-          
             if echo "$COMMIT_MESSAGE" | grep -E "fix:"; then
               APPEND_NOTES=true
             fi
           done
-          
-          # Remove trailing newlines from COMMIT_DETAILS
-          COMMIT_DETAILS=$(echo -e "$COMMIT_DETAILS" | sed '/^$/d')
-          
-          # Escape special characters for environment file
-          COMMIT_DETAILS=$(echo -e "$COMMIT_DETAILS" | sed 's/,/\\,/g' | sed 's/:/\\:/g')
-
-          echo "Publish docs to Confluence: $PUBLISH_DOCS"
-          echo "Append notes to Confluence: $APPEND_NOTES"
-          echo "Commit details: $COMMIT_DETAILS"
-
+          COMMIT_DETAILS=$(echo -e "$COMMIT_DETAILS" | sed '/^$/d' | sed 's/,/\\,/g' | sed 's/:/\\:/g')
           echo "::set-output name=publish_docs::$PUBLISH_DOCS"
           echo "::set-output name=append_notes::$APPEND_NOTES"
           echo "::set-output name=commit_details::$(echo "$COMMIT_DETAILS" | sed ':a;N;$!ba;s/\n/\\n/g')"
@@ -125,7 +109,7 @@ jobs:
 
   create-confluence-page:
     runs-on: ubuntu-latest
-    needs: [ build, version-tag ]
+    needs: version-tag
     if: needs.version-tag.outputs.publish_docs == 'true'
     steps:
       - name: Get PR description
@@ -133,14 +117,14 @@ jobs:
         id: get_pr_data
         with:
           script: |
-              return (
-                await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                  commit_sha: context.sha,
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                })
-              ).data[0];
-          
+            return (
+              await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                commit_sha: context.sha,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              })
+            ).data[0];
+
       - name: Get Release
         id: get-release
         uses: actions/github-script@v7
@@ -161,7 +145,7 @@ jobs:
                 body: release.data.body,
                 url: `https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/releases/tag/${tag}`
             };
-  
+
       - name: Post Release Notes to Confluence
         id: post_to_confluence
         shell: bash
@@ -171,33 +155,10 @@ jobs:
           PR_DESCRIPTION: ${{ fromJson(steps.get_pr_data.outputs.result).body }}
           COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
         run: |
-          echo "Release url: ${RELEASE_URL}"
-          echo "Release notes: ${RELEASE_NOTES}"
-          echo "Commit details: ${COMMIT_DETAILS}"
-          echo "PR Description: ${PR_DESCRIPTION}"
-
-          # Remove backslashes before colons in commit details
           COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
-          
-          # Add additional line before the content
           RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}\n\nPR Description:\n${PR_DESCRIPTION}"
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g' | sed -r 's/<[^>]*>//g' | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g' | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g' | sed 's/\\n/<br\/>/g')
 
-          # Remove '##' from RELEASE_NOTES
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
-
-          # Remove extra HTML
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/<[^>]*>//g')
-
-          # Replace markdown links with confluence links
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g')
-
-          # Replace @username with a link to the user's GitHub profile
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g')
-
-          # Replace '\n' with '<br/>'
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/\\n/<br\/>/g')
-  
-          # Prepare the payload
           payload=$(jq -n \
           --arg spaceId "163842" \
           --arg status "current" \
@@ -210,13 +171,11 @@ jobs:
               "title": $title,
               "parentId": $parentId,
               "body": {
-              "representation": "wiki",
-              "value": $value
+                "representation": "wiki",
+                "value": $value
               }
-          }'
-          )
-  
-          echo "Payload: $payload"
+          }')
+
           response=$(curl --request POST \
               --url 'https://agrim.atlassian.net/wiki/api/v2/pages' \
               --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
@@ -225,7 +184,6 @@ jobs:
               --data "$payload")
           echo "Response: $response"
           pageId=$(echo "$response" | jq -r '.id')
-          echo "Page ID: $pageId"
           if [ "$pageId" == "null" ]; then
             echo "Failed to create page"
             exit 1
@@ -234,7 +192,7 @@ jobs:
 
   append-fix-notes:
     runs-on: ubuntu-latest
-    needs: [ build, version-tag ]
+    needs: version-tag
     if: needs.version-tag.outputs.append_notes == 'true'
     steps:
       - name: Get Release
@@ -257,7 +215,7 @@ jobs:
                 body: release.data.body,
                 url: `https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/releases/tag/${tag}`
             };
-            
+
       - name: Get Existing Confluence Page
         id: get_confluence_page
         run: |
@@ -265,19 +223,15 @@ jobs:
               --url 'https://agrim.atlassian.net/wiki/rest/api/content/2490372?expand=body.storage,version' \
               --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
               --header 'Accept: application/json')
-          
-          # Extract necessary data from the response
           existing_content=$(echo "$response" | jq -r '.body.storage.value')
           current_version=$(echo "$response" | jq -r '.version.number')
           title=$(echo "$response" | jq -r '.title')
-          
-          # Pass the extracted data as environment variables
           echo "existing_content<<EOF" >> $GITHUB_ENV
           echo "$existing_content" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
           echo "current_version=$current_version" >> $GITHUB_ENV
           echo "title=$title" >> $GITHUB_ENV
-  
+
       - name: Append Fix Notes to Confluence
         env:
           RELEASE_NOTES: ${{ fromJSON(steps.get-release.outputs.result).body }}
@@ -288,31 +242,11 @@ jobs:
           title="${{ env.title }}"
           new_fix_notes="${{ needs.version-tag.outputs.commit_details }}"
 
-          # Remove backslashes before colons in commit details
           new_fix_notes=$(echo "${new_fix_notes}" | sed 's/\\:/:/g')
-          
-          # Add additional line before the content
           RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${new_fix_notes}"
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g' | sed -r 's/<[^>]*>//g' | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g' | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g' | sed 's/\\n/<br\/>/g')
 
-          # Remove '##' from RELEASE_NOTES
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g')
-
-          # Remove extra HTML
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/<[^>]*>//g')
-
-          # Replace markdown links with confluence links
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g')
-
-          # Replace @username with a link to the user's GitHub profile
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g')
-
-          # Replace '\n' with '<br/>'
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/\\n/<br\/>/g')
-
-          # Combine existing content with new fix notes
           updated_content="${existing_content}<br/><br/>${RELEASE_NOTES}"
-          
-          # Prepare the payload with jq
           payload=$(jq -n \
           --arg value "$updated_content" \
           --arg title "$title" \
@@ -330,13 +264,10 @@ jobs:
                 }
               }
           }')
-  
-          # Send the payload to update the Confluence page
+
           response=$(curl --request PUT \
               --url 'https://agrim.atlassian.net/wiki/rest/api/content/2490372' \
               --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
               --header 'Content-Type: application/json' \
               --data "$payload")
-          
-          # Output the response for debugging
           echo "Response: $response"
