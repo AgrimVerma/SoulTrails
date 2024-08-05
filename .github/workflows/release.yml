@@ -127,22 +127,28 @@ jobs:
 
       - name: Get PR Description
         id: get_pr_description
-        if: github.event_name == 'pull_request'
         uses: actions/github-script@v5
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const pr_number = context.payload.pull_request.number;
-            const { data: pr } = await github.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr_number
-            });
-            const pr_description = pr.body || '';
-            console.log(`PR Description: ${pr_description}`);
-            return {
-              pr_description
-            };
+            const pr_number = context.payload.pull_request ? context.payload.pull_request.number : null;
+            if (pr_number) {
+              const { data: pr } = await github.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr_number
+              });
+              const pr_description = pr.body || '';
+              console.log(`PR Description: ${pr_description}`);
+              return {
+                pr_description
+              };
+            } else {
+              console.log('No PR description available');
+              return {
+                pr_description: ''
+              };
+            }
 
   create-confluence-page:
     runs-on: ubuntu-latest
