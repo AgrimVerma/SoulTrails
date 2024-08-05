@@ -275,7 +275,7 @@ jobs:
 
           # Remove backslashes before colons in commit details
           new_fix_notes=$(echo "${new_fix_notes}" | sed 's/\\:/:/g')
-
+          
           # Add additional line before the content
           RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${new_fix_notes}"
 
