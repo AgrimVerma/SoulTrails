@@ -218,76 +218,68 @@ jobs:
           echo "pageId=$pageId" >> $GITHUB_ENV
 
   append-fix-notes:
-      runs-on: ubuntu-latest
-      needs: [ build, version-tag ]
-      if: needs.version-tag.outputs.append_notes == 'true'
-      steps:
-        - name: Get Existing Confluence Page
-          id: get_confluence_page
-          run: |
-            response=$(curl --request GET \
-                --url 'https://agrim.atlassian.net/wiki/rest/api/content/1146899?expand=body.storage,version' \
-                --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
-                --header 'Accept: application/json')
-            echo "Response: $response"
-            title=$(echo "$response" | jq -r '.title')
-            existing_content=$(echo "$response" | jq -r '.body.storage.value')
-            current_version=$(echo "$response" | jq -r '.version.number')
-            echo "existing_content<<EOF" >> $GITHUB_ENV
-            echo "$existing_content" >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
-            echo "current_version=$current_version" >> $GITHUB_ENV
-            echo "title=$title" >> $GITHUB_ENV
-    
-        - name: Append Fix Notes to Confluence
-          run: |
-            existing_content="${{ env.existing_content }}"
-            current_version=${{ env.current_version }}
-            title=${{ env.title }}
-            new_fix_notes="Commit Details:\n${{ needs.version-tag.outputs.commit_details }}"
-    
-            # Remove backslashes before colons in commit details
-            new_fix_notes=$(echo "$new_fix_notes" | sed 's/\\:/:/g')
-    
-            # Convert new_fix_notes to Confluence format
-            new_fix_notes=$(echo -e "$new_fix_notes" | sed 's/\n/<br\/>/g')
-    
-            # Print modified new_fix_notes
-            echo "New Fix Notes (formatted): ${new_fix_notes}"
-    
-            # Append new_fix_notes to existing_content
-            updated_content="${existing_content}<br/><br/>${new_fix_notes}"
-    
-            # Prepare the payload
-            payload=$(jq -n \
-            --arg value "$updated_content" \
-            --arg title "$title" \
-            --argjson version $((current_version + 1)) \
-            '{
-                "version": {
-                  "number": $version
-                },
-                "title": $title,
-                "type": "page",
-                "body": {
-                  "storage": {
-                    "value": $value,
-                    "representation": "storage"
-                  }
+    runs-on: ubuntu-latest
+    needs: [ build, version-tag ]
+    if: needs.version-tag.outputs.append_notes == 'true'
+    steps:
+      - name: Get Existing Confluence Page
+        id: get_confluence_page
+        run: |
+          response=$(curl --request GET \
+              --url 'https://agrim.atlassian.net/wiki/rest/api/content/1146899?expand=body.storage,version' \
+              --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
+              --header 'Accept: application/json')
+          
+          # Extract necessary data from the response
+          existing_content=$(echo "$response" | jq -r '.body.storage.value')
+          current_version=$(echo "$response" | jq -r '.version.number')
+          title=$(echo "$response" | jq -r '.title')
+          
+          # Pass the extracted data as environment variables
+          echo "existing_content<<EOF" >> $GITHUB_ENV
+          echo "$existing_content" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          echo "current_version=$current_version" >> $GITHUB_ENV
+          echo "title=$title" >> $GITHUB_ENV
+  
+      - name: Append Fix Notes to Confluence
+        run: |
+          existing_content="${{ env.existing_content }}"
+          current_version=${{ env.current_version }}
+          title="${{ env.title }}"
+          new_fix_notes="Commit Details:\n${{ needs.version-tag.outputs.commit_details }}"
+  
+          # Process new_fix_notes to ensure correct formatting for Confluence
+          new_fix_notes=$(echo "$new_fix_notes" | sed 's/\\:/:/g' | sed 's/\n/<br\/>/g')
+          
+          # Combine existing content with new fix notes
+          updated_content="${existing_content}<br/><br/>${new_fix_notes}"
+  
+          # Prepare the payload with jq
+          payload=$(jq -n \
+          --arg value "$updated_content" \
+          --arg title "$title" \
+          --argjson version $((current_version + 1)) \
+          '{
+              "version": {
+                "number": $version
+              },
+              "title": $title,
+              "type": "page",
+              "body": {
+                "storage": {
+                  "value": $value,
+                  "representation": "storage"
                 }
-            }'
-            )
-    
-            response=$(curl --request PUT \
-                --url 'https://agrim.atlassian.net/wiki/rest/api/content/1146899' \
-                --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
-                --header 'Content-Type: application/json' \
-                --data "$payload")
-                
-            # Print response
-            echo "Response: $response"
-    
-                  
-              # Print response
-              echo "Response: $response"
-    
+              }
+          }')
+  
+          # Send the payload to update the Confluence page
+          response=$(curl --request PUT \
+              --url 'https://agrim.atlassian.net/wiki/rest/api/content/1146899' \
+              --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
+              --header 'Content-Type: application/json' \
+              --data "$payload")
+          
+          # Output the response for debugging
+          echo "Response: $response"
