@@ -275,19 +275,19 @@ jobs:
 
           # Remove backslashes before colons in commit details
           new_fix_notes=$(echo "${new_fix_notes}" | sed 's/\\:/:/g')
-          
-          # Combine existing content with new fix notes
-          updated_content="${existing_content}<br/><br/>${new_fix_notes}"
 
           # Add additional line before the content
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${updated_content}"
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${new_fix_notes}"
+
+          # Combine existing content with new fix notes
+          updated_content="${existing_content}<br/><br/>${RELEASE_NOTES}"
 
           # Replace '\n' with '<br/>'
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/\\n/<br\/>/g')
+          updated_content=$(echo -e "${updated_content}" | sed 's/\\n/<br\/>/g')
           
           # Prepare the payload with jq
           payload=$(jq -n \
-          --arg value "$RELEASE_NOTES" \
+          --arg value "$updated_content" \
           --arg title "$title" \
           --argjson version $((current_version + 1)) \
           '{
