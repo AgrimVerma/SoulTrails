@@ -134,7 +134,8 @@ jobs:
             exit 1
           fi
           sanitized_jira_issue_key=$(echo "$jira_issue_key" | sed 's/[^a-zA-Z0-9_-]//g')
-          echo "jira_issue_key=$sanitized_jira_issue_key" >> $GITHUB_ENV
+          echo "jira_issue_key=$sanitized_jira_issue_key" > temp.env
+          cat temp.env >> $GITHUB_ENV
 
       - name: Fetch JIRA Issue Details
         id: fetch-jira-details
