@@ -28,6 +28,12 @@ jobs:
       append_notes: ${{ steps.check_commits.outputs.append_notes }}
       commit_details: ${{ steps.check_commits.outputs.commit_details }}
     steps:
+      - name: test
+        run: |
+          echo "jiraissue=AG1" >> $GITHUB_ENV
+          echo "jira_issue1=AG1" >> $GITHUB_ENV
+          echo "jira_issue=AG-1" >> $GITHUB_ENV
+          
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.head_ref }}
