@@ -178,8 +178,8 @@ jobs:
         id: post_to_confluence
         shell: bash
         env:
-          RELEASE_NOTES: ${{ fromJSON(steps.get-release.outputs.result).body }}
-          RELEASE_URL: ${{ fromJSON(steps.get-release.outputs.result).url }}
+          RELEASE_NOTES: ${{ fromJson(steps.get-release.outputs.result).body }}
+          RELEASE_URL: ${{ fromJson(steps.get-release.outputs.result).url }}
           PR_DESCRIPTION: ${{ fromJson(steps.get_pr_data.outputs.result).body }}
           COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
         run: |
