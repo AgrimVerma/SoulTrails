@@ -125,6 +125,32 @@ jobs:
               })
             ).data[0];
 
+      - name: Extract JIRA Issue Key from PR Description
+        id: extract-jira-key
+        run: |
+          jira_issue_key=$(echo "${{ fromJson(steps.get_pr_data.outputs.result).body }}" | grep -oE '[A-Z]+-[0-9]+')
+          if [ -z "$jira_issue_key" ]; then
+            echo "No JIRA issue key found in the PR description."
+            exit 1
+          fi
+          echo "jira_issue_key=$jira_issue_key" >> $GITHUB_ENV
+
+      - name: Fetch JIRA Issue Details
+        id: fetch-jira-details
+        run: |
+          response=$(curl -u ${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }} \
+            -X GET -H "Content-Type: application/json" \
+            "https://agrim.atlassian.net/rest/api/2/issue/${{ env.jira_issue_key }}")
+          
+          jira_summary=$(echo $response | jq -r '.fields.summary')
+          jira_description=$(echo $response | jq -r '.fields.description')
+          if [ -z "$jira_summary" ]; then
+            echo "Failed to fetch JIRA issue details."
+            exit 1
+          fi
+          echo "jira_summary=$jira_summary" >> $GITHUB_ENV
+          echo "jira_description=$jira_description" >> $GITHUB_ENV
+
       - name: Get Release
         id: get-release
         uses: actions/github-script@v7
