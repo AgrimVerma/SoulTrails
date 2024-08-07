@@ -74,7 +74,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.head_ref }}
-          confluence-email: ${{ secrets.CONFLUENCE_EMAIL }}
+          confluence-email: ${{ vars.CONFLUENCE_EMAIL }}
           confluence-api-token: ${{ secrets.CONFLUENCE_API_TOKEN }}
           confluence-url: 'https://agrim.atlassian.net'
           confluence-space-id: '163842'
