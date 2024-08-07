@@ -19,6 +19,10 @@ jobs:
 
       - name: Check Node.js Version
         run: node --version
+      
+      - name: Install dependencies
+        run: npm install
+        working-directory: ./actions/version-tagging
 
   version-tag:
     runs-on: ubuntu-latest
