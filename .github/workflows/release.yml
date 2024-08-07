@@ -60,3 +60,20 @@ jobs:
           echo "append_notes=$APPEND_NOTES"
           echo "commit_details=$COMMIT_DETAILS"
         shell: bash
+
+  create-confluence-page:
+    runs-on: ubuntu-latest
+    needs: version-tag
+    if: needs.version-tag.outputs.publish_docs == 'true'
+    steps: 
+      - name: Create confluence page
+        uses: ./.github/actions/create-confluence-page
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.head_ref }}
+          confluence-email: ${{ secrets.CONFLUENCE_EMAIL }}
+          confluence-api-token: ${{ secrets.CONFLUENCE_API_TOKEN }}
+          confluence-url: 'https://agrim.atlassian.net'
+          confluence-space-id: '163842'
+          confluence-parent-id: '163998'
+      
