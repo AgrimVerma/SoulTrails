@@ -1,9 +1,9 @@
-on:
-  workflow_dispatch:
-  push:
-    branches: [ master, add/gh-action-prod ]
+name: Deploy and Release Workflow
 
-name: Deploy Production CGK
+on:
+  push:
+    branches: [master, add/gh-action-prod]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -22,13 +22,15 @@ jobs:
 
   version-tag:
     runs-on: ubuntu-latest
+    needs: build
     outputs:
       version: ${{ steps.version.outputs.version }}
       publish_docs: ${{ steps.check_commits.outputs.publish_docs }}
       append_notes: ${{ steps.check_commits.outputs.append_notes }}
       commit_details: ${{ steps.check_commits.outputs.commit_details }}
     steps:          
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
@@ -44,46 +46,12 @@ jobs:
             echo "::set-output name=rerun::false"
           fi
 
-      - name: Create Version Tagging
+      - name: Version Tagging
         if: steps.check_rerun.outputs.rerun == 'false'
         id: version
-        uses: codacy/git-version@2.7.0
-        with:
-          prefix: "v"
-          major-identifier: "break:"
-          minor-identifier: "feat:"
-
-      - name: Get Previous Tag
-        if: steps.check_rerun.outputs.rerun == 'false'
-        id: previous-tag
-        run: |
-          git fetch --tags
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0)
-          echo "PREVIOUS_TAG=$PREVIOUS_TAG" >> $GITHUB_ENV
-
-      - name: Push Tagging
-        if: steps.check_rerun.outputs.rerun == 'false'
-        uses: actions/github-script@v5
+        uses: Agrim-V/qoala-tools/version-tagging-action@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            github.rest.git.createRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: 'refs/tags/${{ steps.version.outputs.version }}',
-              sha: context.sha
-            })
-
-      - name: Create release notes
-        if: steps.check_rerun.outputs.rerun == 'false'
-        uses: actions/github-script@v4.0.2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            await github.request('POST /repos/${{github.repository}}/releases', {
-              tag_name: '${{ steps.version.outputs.version }}',
-              generate_release_notes: true
-            })
 
       - name: Check commit messages for keywords
         id: check_commits
@@ -112,191 +80,23 @@ jobs:
     needs: version-tag
     if: needs.version-tag.outputs.publish_docs == 'true'
     steps:
-      - name: Get PR description
-        uses: actions/github-script@v6
-        id: get_pr_data
+      - name: Create Confluence Page
+        uses: Agrim-V/qoala-tools/create-confluence-page-action@main
         with:
-          script: |
-            return (
-              await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                commit_sha: context.sha,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-              })
-            ).data[0];
-
-      - name: Extract JIRA Issue Key from PR Description
-        id: extract-jira-key
-        run: |
-          jira_issue_key=$(echo "${{ fromJson(steps.get_pr_data.outputs.result).body }}" | grep -oE '[A-Z]+-[0-9]+' | head -n 1)
-          if [ -z "$jira_issue_key" ]; then
-            echo "No JIRA issue key found in the PR description."
-            exit 1
-          fi
-          sanitized_jira_issue_key=$(echo "$jira_issue_key" | sed 's/[^a-zA-Z0-9_-]//g')
-          echo "jira_issue_key=$sanitized_jira_issue_key" >> $GITHUB_ENV
-
-      - name: Fetch JIRA Issue Details
-        id: fetch-jira-details
-        run: |
-          response=$(curl -u ${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }} \
-            -X GET -H "Content-Type: application/json" \
-            "https://agrim.atlassian.net/rest/api/2/issue/${{ env.jira_issue_key }}")
-          
-          jira_summary=$(echo $response | jq -r '.fields.summary')
-          jira_description=$(echo $response | jq -r '.fields.description')
-          if [ -z "$jira_summary" ]; then
-            echo "Failed to fetch JIRA issue details."
-            exit 1
-          fi
-          echo "jira_summary=$jira_summary" >> $GITHUB_ENV
-          echo "jira_description=$jira_description" >> $GITHUB_ENV
-
-      - name: Get Release
-        id: get-release
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const tag = '${{ needs.version-tag.outputs.version }}';
-            const release = await github.rest.repos.getReleaseByTag({
-              owner: '${{ github.repository_owner }}',
-              repo: '${{ github.event.repository.name }}',
-              tag: tag
-            });
-            if (!release || !release.data.body) {
-                console.error('Invalid release');
-                return;
-            }
-            console.log(release.data.body);
-            return {
-                body: release.data.body,
-                url: `https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/releases/tag/${tag}`
-            };
-
-      - name: Post Release Notes to Confluence
-        id: post_to_confluence
-        shell: bash
-        env:
-          RELEASE_NOTES: ${{ fromJson(steps.get-release.outputs.result).body }}
-          RELEASE_URL: ${{ fromJson(steps.get-release.outputs.result).url }}
-          PR_DESCRIPTION: ${{ fromJson(steps.get_pr_data.outputs.result).body }}
-          COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
-          JIRA_SUMMARY: ${{ env.jira_summary }}
-          JIRA_DESCRIPTION: ${{ env.jira_description }}
-        run: |
-          COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n${RELEASE_NOTES}\nCommit Details:\n${COMMIT_DETAILS}\nPR Description:\n${PR_DESCRIPTION}\nTicket Details:\n${JIRA_SUMMARY}\n${JIRA_DESCRIPTION}"
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g' | sed -r 's/<[^>]*>//g' | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g' | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g' | sed 's/\\n/<br\/>/g')
-
-          payload=$(jq -n \
-          --arg spaceId "163842" \
-          --arg status "current" \
-          --arg title "Release: ${{ needs.version-tag.outputs.version }}" \
-          --arg parentId "163998" \
-          --arg value "$RELEASE_NOTES" \
-          '{
-              "spaceId": $spaceId,
-              "status": $status,
-              "title": $title,
-              "parentId": $parentId,
-              "body": {
-                "representation": "wiki",
-                "value": $value
-              }
-          }')
-
-          response=$(curl --request POST \
-              --url 'https://agrim.atlassian.net/wiki/api/v2/pages' \
-              --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
-              --header 'Accept: application/json' \
-              --header 'Content-Type: application/json' \
-              --data "$payload")
-          echo "Response: $response"
-          pageId=$(echo "$response" | jq -r '.id')
-          if [ "$pageId" == "null" ]; then
-            echo "Failed to create page"
-            exit 1
-          fi
-          echo "pageId=$pageId" >> $GITHUB_ENV
+          confluence-email: ${{ secrets.CONFLUENCE_EMAIL }}
+          confluence-api-token: ${{ secrets.CONFLUENCE_API_TOKEN }}
+          version: ${{ needs.version-tag.outputs.version }}
+          commit-details: ${{ needs.version-tag.outputs.commit_details }}
 
   append-fix-notes:
     runs-on: ubuntu-latest
     needs: version-tag
     if: needs.version-tag.outputs.append_notes == 'true'
     steps:
-      - name: Get Release
-        id: get-release
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const tag = '${{ needs.version-tag.outputs.version }}';
-            const release = await github.rest.repos.getReleaseByTag({
-              owner: '${{ github.repository_owner }}',
-              repo: '${{ github.event.repository.name }}',
-              tag: tag
-            });
-            if (!release || !release.data.body) {
-                console.error('Invalid release');
-                return;
-            }
-            console.log(release.data.body);
-            return {
-                body: release.data.body,
-                url: `https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/releases/tag/${tag}`
-            };
-
-      - name: Get Existing Confluence Page
-        id: get_confluence_page
-        run: |
-          response=$(curl --request GET \
-              --url 'https://agrim.atlassian.net/wiki/rest/api/content/2490372?expand=body.storage,version' \
-              --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
-              --header 'Accept: application/json')
-          existing_content=$(echo "$response" | jq -r '.body.storage.value')
-          current_version=$(echo "$response" | jq -r '.version.number')
-          title=$(echo "$response" | jq -r '.title')
-          echo "existing_content<<EOF" >> $GITHUB_ENV
-          echo "$existing_content" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-          echo "current_version=$current_version" >> $GITHUB_ENV
-          echo "title=$title" >> $GITHUB_ENV
-
       - name: Append Fix Notes to Confluence
-        env:
-          RELEASE_NOTES: ${{ fromJSON(steps.get-release.outputs.result).body }}
-          RELEASE_URL: ${{ fromJSON(steps.get-release.outputs.result).url }}
-        run: |
-          existing_content="${{ env.existing_content }}"
-          current_version=${{ env.current_version }}
-          title="${{ env.title }}"
-          new_fix_notes="${{ needs.version-tag.outputs.commit_details }}"
-
-          new_fix_notes=$(echo "${new_fix_notes}" | sed 's/\\:/:/g')
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${new_fix_notes}"
-          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g' | sed -r 's/<[^>]*>//g' | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g' | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g' | sed 's/\\n/<br\/>/g')
-
-          updated_content="${existing_content}<br/><br/>${RELEASE_NOTES}"
-          payload=$(jq -n \
-          --arg value "$updated_content" \
-          --arg title "$title" \
-          --argjson version $((current_version + 1)) \
-          '{
-              "version": {
-                "number": $version
-              },
-              "title": $title,
-              "type": "page",
-              "body": {
-                "storage": {
-                  "value": $value,
-                  "representation": "storage"
-                }
-              }
-          }')
-
-          response=$(curl --request PUT \
-              --url 'https://agrim.atlassian.net/wiki/rest/api/content/2490372' \
-              --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
-              --header 'Content-Type: application/json' \
-              --data "$payload")
-          echo "Response: $response"
+        uses: Agrim-V/qoala-tools/append-fix-notes-action@main
+        with:
+          confluence-email: ${{ secrets.CONFLUENCE_EMAIL }}
+          confluence-api-token: ${{ secrets.CONFLUENCE_API_TOKEN }}
+          version: ${{ needs.version-tag.outputs.version }}
+          commit-details: ${{ needs.version-tag.outputs.commit_details }}
