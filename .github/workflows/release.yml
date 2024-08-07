@@ -67,7 +67,7 @@ jobs:
     if: needs.version-tag.outputs.publish_docs == 'true'
     steps: 
       - name: Create confluence page
-        uses: ./.github/actions/create-confluence-page
+        uses: AgrimVerma/tools/actions/create-confluence-page@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.head_ref }}
