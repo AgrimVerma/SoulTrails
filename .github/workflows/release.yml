@@ -35,6 +35,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.head_ref }}
+            echo "::set-output name=version::$VERSION"
+            echo "version=$VERSION"
 
       - name: Check commit messages for keywords
         id: check_commits
