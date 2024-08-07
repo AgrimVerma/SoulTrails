@@ -25,12 +25,13 @@ jobs:
     name: Git Version Tagging
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      version: ${{ steps.version-tagging.outputs.version }}
       publish_docs: ${{ steps.check_commits.outputs.publish_docs }}
       append_notes: ${{ steps.check_commits.outputs.append_notes }}
       commit_details: ${{ steps.check_commits.outputs.commit_details }}
     steps:
       - name: Version Tagging
+        id: version-tagging
         uses: AgrimVerma/tools/actions/version-tagging@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
