@@ -36,8 +36,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.head_ref }}
-            echo "::set-output name=version::$VERSION"
-            echo "version=$VERSION"
 
       - name: Check commit messages for keywords
         id: check_commits
@@ -59,6 +57,8 @@ jobs:
           echo "::set-output name=publish_docs::$PUBLISH_DOCS"
           echo "::set-output name=append_notes::$APPEND_NOTES"
           echo "::set-output name=commit_details::$(echo "$COMMIT_DETAILS" | sed ':a;N;$!ba;s/\n/\\n/g')"
+          echo "::set-output name=version::${{ steps.version-tagging.outputs.version }}"
+          echo "version=${{ steps.version-tagging.outputs.version }}"
           echo "publish_docs=$PUBLISH_DOCS"
           echo "append_notes=$APPEND_NOTES"
           echo "commit_details=$COMMIT_DETAILS"
