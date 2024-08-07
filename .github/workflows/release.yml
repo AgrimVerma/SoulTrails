@@ -24,9 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      publish_docs: ${{ steps.check_commits.outputs.publish_docs }}
-      append_notes: ${{ steps.check_commits.outputs.append_notes }}
-      commit_details: ${{ steps.check_commits.outputs.commit_details }}
     steps:          
       - uses: actions/checkout@v3
         with:
@@ -52,15 +49,3 @@ jobs:
           prefix: "v"
           major-identifier: "break:"
           minor-identifier: "feat:"
-
-  create-confluence-page:
-    runs-on: ubuntu-latest
-    needs: version-tag
-    if: needs.version-tag.outputs.publish_docs == 'true'
-    steps:
-      - name: Create Confluence Page
-        uses: Agrim-V/qoala-tools/create-confluence-page-action@main
-        with:
-          jira_issue_key: ${{ env.jira_issue_key }}
-          release_notes: ${{ needs.version-tag.outputs.commit_details }}
-          release_url: "https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/releases/tag/${{ needs.version-tag.outputs.version }}"
