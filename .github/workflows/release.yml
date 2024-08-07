@@ -28,7 +28,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Version Tagging
-        uses: AgrimVerma/tools@main
+        uses: AgrimVerma/tools@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.head_ref }}
