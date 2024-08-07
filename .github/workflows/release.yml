@@ -76,4 +76,5 @@ jobs:
           confluence-url: 'https://agrim.atlassian.net'
           confluence-space-id: '163842'
           confluence-parent-id: '163998'
-      
+          version: ${{ needs.version-tag.outputs.version }}
+          commit-details: ${{ needs.version-tag.outputs.commit_details }}
