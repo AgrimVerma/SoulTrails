@@ -181,7 +181,11 @@ jobs:
           RELEASE_URL: ${{ fromJson(steps.get-release.outputs.result).url }}
           PR_DESCRIPTION: ${{ fromJson(steps.get_pr_data.outputs.result).body }}
           COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
+          JIRA_SUMMARY: ${{ env.jira_summary }}
+          JIRA_DESCRIPTION: ${{ env.jira_description }}
         run: |
+          echo "JIRA_SUMMARY=$JIRA_SUMMARY"
+          echo "JIRA_DESCRIPTION:$JIRA_DESCRIPTION"
           COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
           RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}\n\nPR Description:\n${PR_DESCRIPTION}"
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g' | sed -r 's/<[^>]*>//g' | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g' | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g' | sed 's/\\n/<br\/>/g')
