@@ -32,7 +32,7 @@ jobs:
     steps:
       - name: Version Tagging
         id: version-tagging
-        uses: AgrimVerma/tools/actions/version-tagging@master
+        uses: Agrim-V/qoala-tools/actions/version-tagging@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.head_ref }}
@@ -70,7 +70,7 @@ jobs:
     if: needs.version-tag.outputs.publish_docs == 'true'
     steps: 
       - name: Create confluence page
-        uses: AgrimVerma/tools/actions/create-confluence-page@master
+        uses: Agrim-V/qoala-tools/actions/create-confluence-page@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.head_ref }}
