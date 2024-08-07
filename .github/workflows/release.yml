@@ -27,13 +27,7 @@ jobs:
       publish_docs: ${{ steps.check_commits.outputs.publish_docs }}
       append_notes: ${{ steps.check_commits.outputs.append_notes }}
       commit_details: ${{ steps.check_commits.outputs.commit_details }}
-    steps:
-      - name: test
-        run: |
-          echo "jiraissue=AG1" >> $GITHUB_ENV
-          echo "jira_issue1=AG1" >> $GITHUB_ENV
-          echo "jira_issue=AG-1" >> $GITHUB_ENV
-          
+    steps:          
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.head_ref }}
@@ -134,13 +128,12 @@ jobs:
       - name: Extract JIRA Issue Key from PR Description
         id: extract-jira-key
         run: |
-          jira_issue_key=$(echo "${{ fromJson(steps.get_pr_data.outputs.result).body }}" | grep -oE '[A-Z]+-[0-9]+')
+          jira_issue_key=$(echo "${{ fromJson(steps.get_pr_data.outputs.result).body }}" | grep -oE '[A-Z]+-[0-9]+' | head -n 1)
           if [ -z "$jira_issue_key" ]; then
             echo "No JIRA issue key found in the PR description."
             exit 1
           fi
           sanitized_jira_issue_key=$(echo "$jira_issue_key" | sed 's/[^a-zA-Z0-9_-]//g')
-          echo "jira_issue_key=$sanitized_jira_issue_key"
           echo "jira_issue_key=$sanitized_jira_issue_key" >> $GITHUB_ENV
 
       - name: Fetch JIRA Issue Details
