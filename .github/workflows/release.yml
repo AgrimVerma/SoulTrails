@@ -56,7 +56,7 @@ jobs:
           echo "::set-output name=publish_docs::$PUBLISH_DOCS"
           echo "::set-output name=append_notes::$APPEND_NOTES"
           echo "::set-output name=commit_details::$(echo "$COMMIT_DETAILS" | sed ':a;N;$!ba;s/\n/\\n/g')"
-          echo "PULISH_DOCS=$publish_docs"
-          echo "APPEND_NOTES=$append_notes"
-          echo "COMMIT_DETAILS=$commit_details"
+          echo "publish_docs=$PUBLISH_DOCS"
+          echo "append_notes=$APPEND_NOTES"
+          echo "commit_details=$COMMIT_DETAILS"
         shell: bash
