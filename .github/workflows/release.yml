@@ -185,7 +185,7 @@ jobs:
           JIRA_DESCRIPTION: ${{ env.jira_description }}
         run: |
           COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}\n\nPR Description:\n${PR_DESCRIPTION}\n\nTicket Details:\n${JIRA_SUMMARY}\n${JIRA_DESCRIPTION}"
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n${RELEASE_NOTES}\nCommit Details:\n${COMMIT_DETAILS}\nPR Description:\n${PR_DESCRIPTION}\nTicket Details:\n${JIRA_SUMMARY}\n${JIRA_DESCRIPTION}"
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | sed 's/## //g' | sed -r 's/<[^>]*>//g' | sed -r 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g' | sed -r 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g' | sed 's/\\n/<br\/>/g')
 
           payload=$(jq -n \
