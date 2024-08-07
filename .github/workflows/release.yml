@@ -47,7 +47,7 @@ jobs:
       - name: Create Version Tagging
         if: steps.check_rerun.outputs.rerun == 'false'
         id: version
-        uses: Agrim-V/qoala-tools/version-tagging@v1
+        uses: Agrim-V/qoala-tools/version-tagging@main
         with:
           prefix: "v"
           major-identifier: "break:"
@@ -59,7 +59,7 @@ jobs:
     if: needs.version-tag.outputs.publish_docs == 'true'
     steps:
       - name: Create Confluence Page
-        uses: Agrim-V/qoala-tools/confluence-page@v1
+        uses: Agrim-V/qoala-tools/confluence-page@main
         with:
           jira_issue_key: ${{ env.jira_issue_key }}
           release_notes: ${{ needs.version-tag.outputs.commit_details }}
