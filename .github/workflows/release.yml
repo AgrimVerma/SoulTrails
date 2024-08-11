@@ -30,13 +30,19 @@ jobs:
       append_notes: ${{ steps.check_commits.outputs.append_notes }}
       commit_details: ${{ steps.check_commits.outputs.commit_details }}
     steps:
-      - name: Check if previous run was successful
+      - name: Check if previous run was successful or rerun
         id: check_previous_run
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             console.log("Starting to check previous workflow runs...");
+            
+            // Determine if this is a rerun
+            const isRerun = context.event_name === "workflow_run";
+            console.log("Is this a rerun?", isRerun);
+      
+            // Fetch the list of workflow runs
             const runs = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -48,6 +54,7 @@ jobs:
             console.log("Workflow runs fetched successfully.");
             console.log("Number of runs found:", runs.data.workflow_runs.length);
             
+            // Find the last run that is not the current one
             const lastRun = runs.data.workflow_runs.find(run => run.id !== context.runId);
             
             if (lastRun) {
@@ -56,16 +63,22 @@ jobs:
             } else {
               console.log("No previous run found.");
             }
-            
-            if (lastRun && lastRun.conclusion === "success") {
-              console.log("Last run was successful. Skipping tagging.");
-              core.setOutput("skip_tagging", "true");
+      
+            if (isRerun) {
+              // If this is a rerun, check the result of the last run
+              if (lastRun && lastRun.conclusion === "success") {
+                console.log("Last run was successful. Skipping tagging.");
+                core.setOutput("skip_tagging", "true");
+              } else {
+                console.log("Last run was not successful. Retrying tagging.");
+                core.setOutput("skip_tagging", "false");
+              }
             } else {
-              console.log("Last run was not successful or no previous run found. Proceeding with tagging.");
+              // If this is a fresh run, do not skip tagging
+              console.log("This is a fresh run. Proceeding with tagging.");
               core.setOutput("skip_tagging", "false");
             }
 
-      
       - name: Version Tagging
         if: steps.check_previous_run.outputs.skip_tagging == 'false'
         id: version-tagging
