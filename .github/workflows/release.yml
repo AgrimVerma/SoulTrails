@@ -30,20 +30,27 @@ jobs:
       append_notes: ${{ steps.check_commits.outputs.append_notes }}
       commit_details: ${{ steps.check_commits.outputs.commit_details }}
     steps:
-      - name: Determine if rerun
-        id: check_rerun
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_run" ]; then
-            echo "This is a rerun"
-            echo "::set-output name=rerun::true"
-          else
-            echo "This is a fresh run"
-            echo "::set-output name=rerun::false"
-          fi
-        shell: bash
+      - name: Check if previous run was successful
+        id: check_previous_run
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const runs = await github.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: context.workflow,
+              branch: context.ref,
+              event: "push"
+            });
+            const lastRun = runs.data.workflow_runs.find(run => run.id !== context.runId);
+            if (lastRun && lastRun.conclusion === "success") {
+              core.setOutput("skip_tagging", "true");
+            } else {
+              core.setOutput("skip_tagging", "false");
+            }
       
       - name: Version Tagging
-        if: steps.check_rerun.outputs.rerun == 'false'
+        if: steps.check_previous_run.outputs.skip_tagging == 'false'
         id: version-tagging
         uses: Agrim-V/qoala-tools/actions/version-tagging@main
         with:
@@ -51,7 +58,7 @@ jobs:
           ref: ${{ github.head_ref }}
 
       - name: Check commit messages for keywords
-        if: steps.check_rerun.outputs.rerun == 'false'
+        if: steps.check_previous_run.outputs.skip_tagging == 'false'
         id: check_commits
         run: |
           PUBLISH_DOCS=false
