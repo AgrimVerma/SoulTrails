@@ -36,6 +36,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            console.log("Starting to check previous workflow runs...");
             const runs = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -43,12 +44,27 @@ jobs:
               branch: context.ref.replace('refs/heads/', ''),
               event: "push"
             });
+      
+            console.log("Workflow runs fetched successfully.");
+            console.log("Number of runs found:", runs.data.workflow_runs.length);
+            
             const lastRun = runs.data.workflow_runs.find(run => run.id !== context.runId);
+            
+            if (lastRun) {
+              console.log("Last run found with ID:", lastRun.id);
+              console.log("Last run conclusion:", lastRun.conclusion);
+            } else {
+              console.log("No previous run found.");
+            }
+            
             if (lastRun && lastRun.conclusion === "success") {
+              console.log("Last run was successful. Skipping tagging.");
               core.setOutput("skip_tagging", "true");
             } else {
+              console.log("Last run was not successful or no previous run found. Proceeding with tagging.");
               core.setOutput("skip_tagging", "false");
             }
+
       
       - name: Version Tagging
         if: steps.check_previous_run.outputs.skip_tagging == 'false'
