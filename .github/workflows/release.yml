@@ -145,13 +145,15 @@ jobs:
           jira_issue_key=$(echo "${{ fromJson(steps.get_pr_data.outputs.result).body }}" | grep -oE '[A-Z]+-[0-9]+' | head -n 1)
           if [ -z "$jira_issue_key" ]; then
             echo "No JIRA issue key found in the PR description."
-            exit 1
+            echo "jira_issue_key=none" >> $GITHUB_ENV
+          else
+            sanitized_jira_issue_key=$(echo "$jira_issue_key" | sed 's/[^a-zA-Z0-9_-]//g')
+            echo "jira_issue_key=$sanitized_jira_issue_key" >> $GITHUB_ENV
           fi
-          sanitized_jira_issue_key=$(echo "$jira_issue_key" | sed 's/[^a-zA-Z0-9_-]//g')
-          echo "jira_issue_key=$sanitized_jira_issue_key" >> $GITHUB_ENV
         shell: bash
   
       - name: Fetch JIRA Issue Details
+        if: env.jira_issue_key != 'none'
         id: fetch-jira-details
         run: |
           response=$(curl -u ${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }} \
@@ -205,37 +207,40 @@ jobs:
           TICKET_TYPE: ${{ env.ticket_type }}
         run: |
           COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n${RELEASE_NOTES}\n\n*Commit Details*:\n${COMMIT_DETAILS}\n\n*Pr Description*:\n${PR_DESCRIPTION}\n\n*Ticket Details*:\n${TICKET_SUMMARY}\n${TICKET_DESCRIPTION}"
-  
-          if [ "$TICKET_TYPE" == "Epic" ]; then
-            echo "TICKET_TYPE is 'Epic', calling Jira API..."
-            jira_response=$(curl --request GET \
-                --url "https://agrim.atlassian.net/rest/api/2/search?jql=parent=$TICKET_ISSUE_KEY&fields=summary,status,description" \
-                --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
-                --header 'Accept: application/json')
-  
-            echo "Jira API Response: $jira_response"
-            extracted_data=$(echo "$jira_response" | jq '.issues[] | {key: .key, status: .fields.status.name, summary: .fields.summary, description: .fields.description}')
-            FORMATTED_JIRA_ISSUES=$(echo "${extracted_data}" | awk '
-              BEGIN { in_jira=0; }
-              {
-                if ($1 == "{") { in_jira=1; if (NR > 1) print ""; }
-                if (in_jira && $1 == "\"key\":") { gsub(/,$/, "", $2); printf "*Key*: %s\n", $2 }
-                if (in_jira && $1 == "\"status\":") { gsub(/,$/, "", $2); printf "  *Status*: %s\n", $2 }
-                if (in_jira && $1 == "\"summary\":") { gsub(/,$/, "", $2); printf "  *Summary*: %s\n", $2 }
-                if (in_jira && $1 == "\"description\":") { gsub(/,$/, "", $2); printf "  *Description*: %s\n", $2; in_jira=0 }
-              }'
-            )
-            RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$FORMATTED_JIRA_ISSUES"
+          if [ "$TICKET_ISSUE_KEY" == "none" ]; then
+            RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n${RELEASE_NOTES}\n\n*Commit Details*:\n${COMMIT_DETAILS}\n\n*Pr Description*:\n${PR_DESCRIPTION}"
+          else
+            RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n${RELEASE_NOTES}\n\n*Commit Details*:\n${COMMIT_DETAILS}\n\n*Pr Description*:\n${PR_DESCRIPTION}\n\n*Ticket Details*:\n${TICKET_SUMMARY}\n${TICKET_DESCRIPTION}"
+            if [ "$TICKET_TYPE" == "Epic" ]; then
+              echo "TICKET_TYPE is 'Epic', calling Jira API..."
+              jira_response=$(curl --request GET \
+                  --url "https://agrim.atlassian.net/rest/api/2/search?jql=parent=$TICKET_ISSUE_KEY&fields=summary,status,description" \
+                  --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
+                  --header 'Accept: application/json')
+    
+              echo "Jira API Response: $jira_response"
+              extracted_data=$(echo "$jira_response" | jq '.issues[] | {key: .key, status: .fields.status.name, summary: .fields.summary, description: .fields.description}')
+              FORMATTED_JIRA_ISSUES=$(echo "${extracted_data}" | awk '
+                BEGIN { in_jira=0; }
+                {
+                  if ($1 == "{") { in_jira=1; if (NR > 1) print ""; }
+                  if (in_jira && $1 == "\"key\":") { gsub(/,$/, "", $2); printf "*Key*: %s\n", $2 }
+                  if (in_jira && $1 == "\"status\":") { gsub(/,$/, "", $2); printf "  *Status*: %s\n", $2 }
+                  if (in_jira && $1 == "\"summary\":") { gsub(/,$/, "", $2); printf "  *Summary*: %s\n", $2 }
+                  if (in_jira && $1 == "\"description\":") { gsub(/,$/, "", $2); printf "  *Description*: %s\n", $2; in_jira=0 }
+                }'
+              )
+              RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$FORMATTED_JIRA_ISSUES"
+            fi
           fi
-          echo "Data: $RELEASE_NOTES"
+          echo "RELEASE_NOTES: $RELEASE_NOTES"
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | \
             sed 's/## //g' | \
             sed -E 's/<[^>]*>//g' | \
             sed -E 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g' | \
             sed -E 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g' | \
             sed 's/\\n/\n/g')
-          echo "Data: $RELEASE_NOTES"
+          echo "RELEASE_NOTES: $RELEASE_NOTES"
   
           payload=$(jq -n \
           --arg spaceId "163842" \
