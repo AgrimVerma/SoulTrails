@@ -30,65 +30,65 @@ jobs:
       append_notes: ${{ steps.check_commits.outputs.append_notes }}
       commit_details: ${{ steps.check_commits.outputs.commit_details }}
     steps:
-      - name: Check if previous run was successful or rerun
-        id: check_previous_run
-        uses: actions/github-script@v6
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Determine if rerun
+        id: check_rerun
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+            echo "This is a rerun"
+            echo "::set-output name=rerun::true"
+          else
+            echo "This is a fresh run"
+            echo "::set-output name=rerun::false"
+          fi
+
+      - name: Create Version Tagging
+        if: steps.check_rerun.outputs.rerun == 'false'
+        id: version
+        uses: codacy/git-version@2.7.0
+        with:
+          prefix: "v"
+          major-identifier: "break:"
+          minor-identifier: "feat:"
+
+      - name: Get Previous Tag
+        if: steps.check_rerun.outputs.rerun == 'false'
+        id: previous-tag
+        run: |
+          git fetch --tags
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0)
+          echo "PREVIOUS_TAG=$PREVIOUS_TAG" >> $GITHUB_ENV
+
+      - name: Push Tagging
+        if: steps.check_rerun.outputs.rerun == 'false'
+        uses: actions/github-script@v5
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            console.log("Starting to check previous workflow runs...");
-            
-            // Determine if this is a rerun
-            const isRerun = context.event_name === "workflow_run";
-            console.log("Is this a rerun?", isRerun);
-      
-            // Fetch the list of workflow runs
-            const runs = await github.rest.actions.listWorkflowRuns({
+            github.rest.git.createRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: '110421663',
-              branch: context.ref.replace('refs/heads/', ''),
-              event: "push"
-            });
-      
-            console.log("Workflow runs fetched successfully.");
-            console.log("Number of runs found:", runs.data.workflow_runs.length);
-            
-            // Find the last run that is not the current one
-            const lastRun = runs.data.workflow_runs.find(run => run.id !== context.runId);
-            
-            if (lastRun) {
-              console.log("Last run found with ID:", lastRun.id);
-              console.log("Last run conclusion:", lastRun.conclusion);
-            } else {
-              console.log("No previous run found.");
-            }
-      
-            if (isRerun) {
-              // If this is a rerun, check the result of the last run
-              if (lastRun && lastRun.conclusion === "success") {
-                console.log("Last run was successful. Skipping tagging.");
-                core.setOutput("skip_tagging", "true");
-              } else {
-                console.log("Last run was not successful. Retrying tagging.");
-                core.setOutput("skip_tagging", "false");
-              }
-            } else {
-              // If this is a fresh run, do not skip tagging
-              console.log("This is a fresh run. Proceeding with tagging.");
-              core.setOutput("skip_tagging", "false");
-            }
+              ref: 'refs/tags/${{ steps.version.outputs.version }}',
+              sha: context.sha
+            })
 
-      - name: Version Tagging
-        if: steps.check_previous_run.outputs.skip_tagging == 'false'
-        id: version-tagging
-        uses: Agrim-V/qoala-tools/actions/version-tagging@main
+      - name: Create release notes
+        if: steps.check_rerun.outputs.rerun == 'false'
+        uses: actions/github-script@v4.0.2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.head_ref }}
+          script: |
+            await github.request('POST /repos/${{github.repository}}/releases', {
+              tag_name: '${{ steps.version.outputs.version }}',
+              generate_release_notes: true
+            })
 
       - name: Check commit messages for keywords
-        if: steps.check_previous_run.outputs.skip_tagging == 'false'
+        if: steps.check_rerun.outputs.rerun == 'false'
         id: check_commits
         run: |
           PUBLISH_DOCS=false
@@ -120,15 +120,153 @@ jobs:
     needs: version-tag
     if: needs.version-tag.outputs.publish_docs == 'true'
     steps: 
-      - name: Create confluence page
-        uses: Agrim-V/qoala-tools/actions/create-confluence-page@main
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.head_ref }}
-          confluence-email: ${{ vars.CONFLUENCE_EMAIL }}
-          confluence-api-token: ${{ secrets.CONFLUENCE_API_TOKEN }}
-          confluence-url: 'https://agrim.atlassian.net'
-          confluence-space-id: '163842'
-          confluence-parent-id: '163998'
-          version: ${{ needs.version-tag.outputs.version }}
-          commit-details: ${{ needs.version-tag.outputs.commit_details }}
+          fetch-depth: 0
+          
+      - name: Get PR description
+        uses: actions/github-script@v6
+        id: get_pr_data
+        with:
+          script: |
+            return (
+              await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                commit_sha: context.sha,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              })
+            ).data[0];
+  
+      - name: Extract JIRA Issue Key from PR Description
+        id: extract-jira-key
+        run: |
+          jira_issue_key=$(echo "${{ fromJson(steps.get_pr_data.outputs.result).body }}" | grep -oE '[A-Z]+-[0-9]+' | head -n 1)
+          if [ -z "$jira_issue_key" ]; then
+            echo "No JIRA issue key found in the PR description."
+            exit 1
+          fi
+          sanitized_jira_issue_key=$(echo "$jira_issue_key" | sed 's/[^a-zA-Z0-9_-]//g')
+          echo "jira_issue_key=$sanitized_jira_issue_key" >> $GITHUB_ENV
+        shell: bash
+  
+      - name: Fetch JIRA Issue Details
+        id: fetch-jira-details
+        run: |
+          response=$(curl -u ${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }} \
+            -X GET -H "Content-Type: application/json" \
+            "https://agrim.atlassian.net/rest/api/2/issue/${{ env.jira_issue_key }}")
+          
+          ticket_summary=$(echo $response | jq -r '.fields.summary')
+          ticket_description=$(echo $response | jq -r '.fields.description')
+          ticket_type=$(echo $response | jq -r '.fields.issuetype.name')
+          if [ -z "$ticket_summary" ]; then
+            echo "Failed to fetch JIRA issue details."
+            exit 1
+          fi
+          echo "ticket_summary=$ticket_summary" >> $GITHUB_ENV
+          echo "ticket_description=$ticket_description" >> $GITHUB_ENV
+          echo "ticket_type=$ticket_type" >> $GITHUB_ENV
+        shell: bash
+  
+      - name: Get Release
+        id: get-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ needs.version-tag.outputs.version }}';
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: '${{ github.repository_owner }}',
+              repo: '${{ github.event.repository.name }}',
+              tag: tag
+            });
+            if (!release || !release.data.body) {
+                console.error('Invalid release');
+                return;
+            }
+            console.log(release.data.body);
+            return {
+                body: release.data.body,
+                url: `https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/releases/tag/${tag}`
+            };
+  
+      - name: Post Release Notes to Confluence
+        id: post_to_confluence
+        shell: bash
+        env:
+          RELEASE_NOTES: ${{ fromJson(steps.get-release.outputs.result).body }}
+          RELEASE_URL: ${{ fromJson(steps.get-release.outputs.result).url }}
+          PR_DESCRIPTION: ${{ fromJson(steps.get_pr_data.outputs.result).body }}
+          COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
+          TICKET_SUMMARY: ${{ env.ticket_summary }}
+          TICKET_DESCRIPTION: ${{ env.ticket_description }}
+          TICKET_ISSUE_KEY: ${{ env.jira_issue_key }}
+          TICKET_TYPE: ${{ env.ticket_type }}
+        run: |
+          COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}\n\nPr Description:\n${PR_DESCRIPTION}\n\nTicket Details:\n${TICKET_SUMMARY}\n${TICKET_DESCRIPTION}"
+  
+          if [ "$TICKET_TYPE" == "Epic" ]; then
+            echo "TICKET_TYPE is 'Epic', calling Jira API..."
+            jira_response=$(curl --request GET \
+                --url "https://agrim.atlassian.net/rest/api/2/search?jql=parent=$TICKET_ISSUE_KEY&fields=summary,status,description" \
+                --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
+                --header 'Accept: application/json')
+  
+            echo "Jira API Response: $jira_response"
+            extracted_data=$(echo "$jira_response" | jq '.issues[] | {key: .key, status: .fields.status.name, summary: .fields.summary, description: .fields.description}')
+            FORMATTED_JIRA_ISSUES=$(echo "${extracted_data}" | awk '
+              BEGIN { in_jira=0; }
+              {
+                if ($1 == "{") { in_jira=1; if (NR > 1) print ""; }
+                if (in_jira && $1 == "\"key\":") { gsub(/,$/, "", $2); printf "*Key*: %s\n", $2 }
+                if (in_jira && $1 == "\"status\":") { gsub(/,$/, "", $2); printf "  *Status*: %s\n", $2 }
+                if (in_jira && $1 == "\"summary\":") { gsub(/,$/, "", $2); printf "  *Summary*: %s\n", $2 }
+                if (in_jira && $1 == "\"description\":") { gsub(/,$/, "", $2); printf "  *Description*: %s\n", $2; in_jira=0 }
+              }'
+            )
+            RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issue:\n$FORMATTED_JIRA_ISSUES"
+          fi
+          echo "Data: $RELEASE_NOTES"
+          FORMATTED_RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | \
+            sed 's/## //g' | \
+            sed -E 's/<[^>]*>//g' | \
+            sed -E 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g' | \
+            sed -E 's/@([^ ]+)/[@\1|https:\/\/github.com\/\1]/g' | \
+            sed 's/\\n/\n/g')
+          echo "Data: $RELEASE_NOTES"
+  
+          payload=$(jq -n \
+          --arg spaceId "163842" \
+          --arg status "current" \
+          --arg title "Release: ${{ needs.version-tag.outputs.version }}" \
+          --arg parentId "163998" \
+          --arg value "$RELEASE_NOTES" \
+          '{
+              "spaceId": $spaceId,
+              "status": $status,
+              "title": $title,
+              "parentId": $parentId,
+              "body": {
+                "representation": "wiki",
+                "value": $value
+              }
+          }')
+  
+          echo "Payload: $payload"
+  
+          response=$(curl --request POST \
+              --url 'https://agrim.atlassian.net/wiki/api/v2/pages' \
+              --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
+              --header 'Accept: application/json' \
+              --header 'Content-Type: application/json' \
+              --data "$payload")
+          echo "Response: $response"
+          pageId=$(echo "$response" | jq -r '.id')
+          if [ "$pageId" == "null" ]; then
+            echo "Failed to create page"
+            exit 1
+          fi
+          echo "pageId=$pageId" >> $GITHUB_ENV
+  
