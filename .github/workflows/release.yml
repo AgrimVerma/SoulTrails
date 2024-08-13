@@ -25,7 +25,7 @@ jobs:
     name: Git Version Tagging
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version-tagging.outputs.version }}
+      version: ${{ steps.version.outputs.version }}
       publish_docs: ${{ steps.check_commits.outputs.publish_docs }}
       append_notes: ${{ steps.check_commits.outputs.append_notes }}
       commit_details: ${{ steps.check_commits.outputs.commit_details }}
