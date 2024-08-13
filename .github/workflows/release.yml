@@ -205,7 +205,7 @@ jobs:
           TICKET_TYPE: ${{ env.ticket_type }}
         run: |
           COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n${RELEASE_NOTES}\n\nCommit Details:\n${COMMIT_DETAILS}\n\nPr Description:\n${PR_DESCRIPTION}\n\nTicket Details:\n${TICKET_SUMMARY}\n${TICKET_DESCRIPTION}"
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n${RELEASE_NOTES}\n\n*Commit Details*:\n${COMMIT_DETAILS}\n\n*Pr Description*:\n${PR_DESCRIPTION}\n\n*Ticket Details*:\n${TICKET_SUMMARY}\n${TICKET_DESCRIPTION}"
   
           if [ "$TICKET_TYPE" == "Epic" ]; then
             echo "TICKET_TYPE is 'Epic', calling Jira API..."
