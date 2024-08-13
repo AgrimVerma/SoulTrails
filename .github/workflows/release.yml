@@ -226,10 +226,10 @@ jobs:
                 if (in_jira && $1 == "\"description\":") { gsub(/,$/, "", $2); printf "  *Description*: %s\n", $2; in_jira=0 }
               }'
             )
-            RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issue:\n$FORMATTED_JIRA_ISSUES"
+            RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$FORMATTED_JIRA_ISSUES"
           fi
           echo "Data: $RELEASE_NOTES"
-          FORMATTED_RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | \
+          RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | \
             sed 's/## //g' | \
             sed -E 's/<[^>]*>//g' | \
             sed -E 's/\[([^]]+)\]\(([^)]+)\)/[\1|\2]/g' | \
