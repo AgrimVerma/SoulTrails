@@ -80,7 +80,7 @@ jobs:
         if: steps.check_rerun.outputs.rerun == 'false'
         uses: actions/github-script@v4.0.2
         with:
-          github-token: ${{ secrets.GIT_HUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const tag = '${{ steps.version.outputs.version }}';
             let release;
