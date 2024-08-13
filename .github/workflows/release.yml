@@ -86,15 +86,6 @@ jobs:
               tag_name: '${{ steps.version.outputs.version }}',
               generate_release_notes: true
             });
-      
-            if (releaseNotes.data.body.length > 125000) {
-              releaseNotes.data.body = releaseNotes.data.body.slice(0, 124900) + '\n... [Truncated due to size limits]';
-            }
-      
-            await github.request('POST /repos/${{github.repository}}/releases', {
-              tag_name: '${{ steps.version.outputs.version }}',
-              body: releaseNotes.data.body
-            });
 
       - name: Check commit messages for keywords
         if: steps.check_rerun.outputs.rerun == 'false'
