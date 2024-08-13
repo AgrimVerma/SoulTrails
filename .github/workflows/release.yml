@@ -80,12 +80,39 @@ jobs:
         if: steps.check_rerun.outputs.rerun == 'false'
         uses: actions/github-script@v4.0.2
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GIT_HUB_TOKEN }}
           script: |
-            await github.request('POST /repos/${{github.repository}}/releases', {
-              tag_name: '${{ steps.version.outputs.version }}',
-              generate_release_notes: true
-            })
+            const tag = '${{ steps.version.outputs.version }}';
+            let release;
+      
+            // Attempt to create the release with generated notes
+            try {
+              release = await github.rest.repos.createRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_name: tag,
+                generate_release_notes: true
+              });
+      
+              let body = release.data.body;
+              const MAX_LENGTH = 125000; // Max length allowed by GitHub
+      
+              // Truncate release notes if they exceed the length limit
+              if (body.length > MAX_LENGTH) {
+                body = body.substring(0, MAX_LENGTH);
+                console.warn('Release notes truncated to fit GitHub API limit.');
+              }
+      
+              console.log(body);
+              return {
+                body: body,
+                url: `https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/releases/tag/${tag}`
+              };
+      
+            } catch (error) {
+              console.error('Failed to create release notes:', error);
+              throw error;
+            }
 
       - name: Check commit messages for keywords
         if: steps.check_rerun.outputs.rerun == 'false'
