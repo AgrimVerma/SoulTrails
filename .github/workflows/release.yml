@@ -215,20 +215,26 @@ jobs:
                   --header 'Accept: application/json')
           
               echo "Jira API Response: $jira_response"
-              extracted_data=$(echo "$jira_response" | jq '.issues[] | {key: .key, status: .fields.status.name, assignee: .fields.assignee.displayName, self: .self}')
+              extracted_data=$(echo "$jira_response" | jq '.issues[] | {key: .key, status: .fields.status.name, assignee: .fields.assignee.displayName, assignee_url: .fields.assignee.self, self: .self}')
               
-              FORMATTED_JIRA_ISSUES=$(echo "${extracted_data}" | awk '
-                BEGIN { in_jira=0; }
+              TABLE_JIRA_ISSUES=$(echo "${extracted_data}" | awk '
+                BEGIN { 
+                  print "|| Issue Link || Status || Assignee ||"; 
+                }
                 {
-                  if ($1 == "{") { in_jira=1; if (NR > 1) print ""; }
-                  if (in_jira && $1 == "\"key\":") { gsub(/,$/, "", $2); printf "*Key*: %s\n", $2 }
-                  if (in_jira && $1 == "\"status\":") { gsub(/,$/, "", $2); printf "  *Status*: %s\n", $2 }
-                  if (in_jira && $1 == "\"assignee\":") { gsub(/,$/, "", $2); printf "  *Assignee*: %s\n", $2 }
-                  if (in_jira && $1 == "\"self\":") { gsub(/,$/, "", $2); printf "  *Issue URL*: %s\n", $2; in_jira=0 }
+                  if ($1 == "{") { in_jira=1; issue_link=""; status=""; assignee=""; assignee_url=""; }
+                  if (in_jira && $1 == "\"key\":") { gsub(/,$/, "", $2); issue_link="https://agrim.atlassian.net/browse/" $2; }
+                  if (in_jira && $1 == "\"status\":") { gsub(/,$/, "", $2); status=$2; }
+                  if (in_jira && $1 == "\"assignee\":") { gsub(/,$/, "", $2); assignee=$2; }
+                  if (in_jira && $1 == "\"self\":") { gsub(/,$/, "", $2); assignee_url=$2; }
+                  if (in_jira && $1 == "}") { 
+                    printf "| [%s] | %s | [%s|%s] |\n", issue_link, status, assignee, assignee_url; 
+                    in_jira=0;
+                  }
                 }'
               )
               
-              RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$FORMATTED_JIRA_ISSUES"
+              RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$TABLE_JIRA_ISSUES"
           fi
           echo "Data: $RELEASE_NOTES"
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | \
