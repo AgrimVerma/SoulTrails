@@ -210,31 +210,47 @@ jobs:
           if [ "$TICKET_TYPE" == "Epic" ]; then
               echo "TICKET_TYPE is 'Epic', calling Jira API..."
               jira_response=$(curl --request GET \
-                  --url "https://agrim.atlassian.net/rest/api/2/search?jql=parent=$TICKET_ISSUE_KEY&fields=status,assignee,self" \
+                  --url "https://agrim.atlassian.net/rest/api/2/search?jql=parent=$TICKET_ISSUE_KEY&fields=summary,status,assignee,self" \
                   --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
                   --header 'Accept: application/json')
           
               echo "Jira API Response: $jira_response"
-              extracted_data=$(echo "$jira_response" | jq '.issues[] | {key: .key, summary: .fields.summary, status: .fields.status.name, assignee: .fields.assignee.displayName, assignee_url: .fields.assignee.self, self: .self}')
+              extracted_data=$(echo "$jira_response" | jq -r '.issues[] | {key: .key, status: .fields.status.name, summary: .fields.summary, assignee: .fields.assignee.displayName, assignee_username: .fields.assignee.name, self: .self}')
               
-              TABLE_JIRA_ISSUES=$(echo "${extracted_data}" | awk '
-                BEGIN { 
-                  print "|| Issue Link || Status || Assignee ||"; 
+              FORMATTED_JIRA_ISSUES=$(echo "${extracted_data}" | awk '
+                BEGIN {
+                  print "|| Issue || Status || Assignee ||";
                 }
                 {
-                  if ($1 == "{") { in_jira=1; summary=""; issue_key=""; status=""; assignee=""; }
-                  if (in_jira && $1 == "\"summary\":") { gsub(/,$/, "", $2); summary=$2; }
-                  if (in_jira && $1 == "\"key\":") { gsub(/,$/, "", $2); gsub(/\"/, "", $2); issue_key=$2; issue_link="https://agrim.atlassian.net/browse/" issue_key; }
-                  if (in_jira && $1 == "\"status\":") { gsub(/,$/, "", $2); gsub(/\"/, "", $2); status=$2; }
-                  if (in_jira && $1 == "\"assignee\":") { gsub(/,$/, "", $2); gsub(/\"/, "", $2); if ($2 == "null") { assignee="@unassigned" } else { assignee="@" $2 }; }
-                  if (in_jira && $1 == "}") { 
-                    printf "| [%s|%s] | %s | %s |\n", summary, issue_link, status, assignee; 
+                  if ($1 == "{") { in_jira=1; issue_link=""; status=""; assignee=""; }
+                  if (in_jira && $1 == "\"key\":") {
+                    gsub(/,$/, "", $2);
+                    issue_link=sprintf("[[%s|%s]]", $4, $2);
+                  }
+                  if (in_jira && $1 == "\"status\":") {
+                    gsub(/,$/, "", $2);
+                    status=$2;
+                  }
+                  if (in_jira && $1 == "\"summary\":") {
+                    gsub(/,$/, "", $2);
+                    issue_link=sprintf("[%s|%s]", $3, $4);
+                  }
+                  if (in_jira && $1 == "\"assignee\":") {
+                    gsub(/,$/, "", $2);
+                    assignee=sprintf("[~%s]", $4);
+                  }
+                  if (in_jira && $1 == "\"assignee_username\":") {
+                    gsub(/,$/, "", $2);
+                    assignee=sprintf("[~%s]", $2);
+                  }
+                  if (in_jira && $1 == "\"self\":") {
+                    print "| " issue_link " | " status " | " assignee " |";
                     in_jira=0;
                   }
                 }'
               )
               
-              RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$TABLE_JIRA_ISSUES"
+              RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$FORMATTED_JIRA_ISSUES"
           fi
           echo "Data: $RELEASE_NOTES"
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | \
