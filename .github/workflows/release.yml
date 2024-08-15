@@ -205,7 +205,7 @@ jobs:
           # TICKET_TYPE: ${{ env.ticket_type }}
         run: |
           COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
-          PR_DESCRIPTION=$(echo "${{ PR_DESCRIPTION }}" | awk '/### Background/,/###/' | sed -e '1d' -e '$d')
+          PR_DESCRIPTION=$(echo "${PR_DESCRIPTION}" | awk '/### Background/,/###/' | sed -e '1d' -e '$d')
           RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n${RELEASE_NOTES}\n\n*Commit Details*:\n${COMMIT_DETAILS}\n\n*Pr Description*:\n${PR_DESCRIPTION}\n\n"
   
           # if [ "$TICKET_TYPE" == "Epic" ]; then
