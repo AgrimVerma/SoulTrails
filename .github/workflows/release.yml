@@ -210,25 +210,26 @@ jobs:
           if [ "$TICKET_TYPE" == "Epic" ]; then
               echo "TICKET_TYPE is 'Epic', calling Jira API..."
               jira_response=$(curl --request GET \
-                  --url "https://agrim.atlassian.net/rest/api/2/search?jql=parent=$TICKET_ISSUE_KEY&fields=status,assignee" \
+                  --url "https://agrim.atlassian.net/rest/api/2/search?jql=parent=$TICKET_ISSUE_KEY&fields=status,assignee,self" \
                   --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
                   --header 'Accept: application/json')
           
               echo "Jira API Response: $jira_response"
-              extracted_data=$(echo "$jira_response" | jq '.issues[] | {key: .key, status: .fields.status.name, assignee: .fields.assignee.name}')
-              echo "Extracted Data: $extracted_data"
+              extracted_data=$(echo "$jira_response" | jq '.issues[] | {key: .key, status: .fields.status.name, assignee: .fields.assignee.displayName, assignee_url: .fields.assignee.self, self: .self}')
               
               TABLE_JIRA_ISSUES=$(echo "${extracted_data}" | awk '
                 BEGIN { 
                   print "|| Issue Link || Status || Assignee ||"; 
                 }
                 {
-                  if ($1 == "{") { in_jira=1; issue_key=""; status=""; assignee=""; }
-                  if (in_jira && $1 == "\"key\":") { gsub(/,$/, "", $2); gsub(/\"/, "", $2); issue_key=$2; issue_link="https://agrim.atlassian.net/browse/" issue_key; }
-                  if (in_jira && $1 == "\"status\":") { gsub(/,$/, "", $2); gsub(/\"/, "", $2); status=$2; }
-                  if (in_jira && $1 == "\"assignee\":") { gsub(/,$/, "", $2); gsub(/\"/, "", $2); if ($2 == "null") { assignee="@unassigned" } else { assignee="@" $2 }; }
+                  if ($1 == "{") { in_jira=1; summary="", issue_link=""; status=""; assignee=""; assignee_url=""; }
+                  if (in_jira && $1 == "\"summary\":") { gsub(/,$/, "", $2); summary=$2; }
+                  if (in_jira && $1 == "\"key\":") { gsub(/,$/, "", $2); issue_link="https://agrim.atlassian.net/browse/" $2; }
+                  if (in_jira && $1 == "\"status\":") { gsub(/,$/, "", $2); status=$2; }
+                  if (in_jira && $1 == "\"assignee\":") { gsub(/,$/, "", $2); assignee=$2; }
+                  if (in_jira && $1 == "\"self\":") { gsub(/,$/, "", $2); assignee_url=$2; }
                   if (in_jira && $1 == "}") { 
-                    printf "| [%s] | %s | %s |\n", issue_link, status, assignee; 
+                    printf "| [%s|%s] | %s | [%s|%s] |\n", summary, issue_link, status, assignee, assignee_url; 
                     in_jira=0;
                   }
                 }'
