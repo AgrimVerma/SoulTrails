@@ -222,14 +222,13 @@ jobs:
                   print "|| Issue Link || Status || Assignee ||"; 
                 }
                 {
-                  if ($1 == "{") { in_jira=1; summary=""; issue_link=""; status=""; assignee=""; assignee_url=""; }
+                  if ($1 == "{") { in_jira=1; summary=""; issue_key=""; status=""; assignee=""; }
                   if (in_jira && $1 == "\"summary\":") { gsub(/,$/, "", $2); summary=$2; }
-                  if (in_jira && $1 == "\"key\":") { gsub(/,$/, "", $2); issue_link="https://agrim.atlassian.net/browse/" $2; }
-                  if (in_jira && $1 == "\"status\":") { gsub(/,$/, "", $2); status=$2; }
-                  if (in_jira && $1 == "\"assignee\":") { gsub(/,$/, "", $2); assignee=$2; }
-                  if (in_jira && $1 == "\"self\":") { gsub(/,$/, "", $2); assignee_url=$2; }
+                  if (in_jira && $1 == "\"key\":") { gsub(/,$/, "", $2); gsub(/\"/, "", $2); issue_key=$2; issue_link="https://agrim.atlassian.net/browse/" issue_key; }
+                  if (in_jira && $1 == "\"status\":") { gsub(/,$/, "", $2); gsub(/\"/, "", $2); status=$2; }
+                  if (in_jira && $1 == "\"assignee\":") { gsub(/,$/, "", $2); gsub(/\"/, "", $2); if ($2 == "null") { assignee="@unassigned" } else { assignee="@" $2 }; }
                   if (in_jira && $1 == "}") { 
-                    printf "| [%s|%s] | %s | [%s|%s] |\n", summary, issue_link, status, assignee, assignee_url; 
+                    printf "| [%s|%s] | %s | %s |\n", summary, issue_link, status, assignee; 
                     in_jira=0;
                   }
                 }'
