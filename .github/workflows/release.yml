@@ -215,7 +215,7 @@ jobs:
                   --header 'Accept: application/json')
           
               echo "Jira API Response: $jira_response"
-              extracted_data=$(echo "$jira_response" | jq '.issues[] | {key: .key, status: .fields.status.name, assignee: .fields.assignee.displayName, assignee_url: .fields.assignee.self, self: .self}')
+              extracted_data=$(echo "$jira_response" | jq '.issues[] | {key: .key, summary: .fields.summary, status: .fields.status.name, assignee: .fields.assignee.displayName, assignee_url: .fields.assignee.self, self: .self}')
               
               TABLE_JIRA_ISSUES=$(echo "${extracted_data}" | awk '
                 BEGIN { 
