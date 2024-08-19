@@ -131,13 +131,19 @@ jobs:
         id: get_pr_data
         with:
           script: |
-            return (
+            const prData = (
               await github.rest.repos.listPullRequestsAssociatedWithCommit({
                 commit_sha: context.sha,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
               })
             ).data[0];
+            
+            const description = prData.body;
+            const backgroundMatch = description.match(/### Background([\s\S]*?)(###|$)/);
+            const background = backgroundMatch ? backgroundMatch[1].trim() : '';
+            
+            return { background };
   
       # - name: Extract JIRA Issue Key from PR Description
       #   id: extract-jira-key
@@ -197,7 +203,7 @@ jobs:
         env:
           RELEASE_NOTES: ${{ fromJson(steps.get-release.outputs.result).body }}
           RELEASE_URL: ${{ fromJson(steps.get-release.outputs.result).url }}
-          PR_DESCRIPTION: ${{ fromJson(steps.get_pr_data.outputs.result).body }}
+          PR_DESCRIPTION: ${{ steps.get_pr_data.outputs.background }}
           COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
           # TICKET_SUMMARY: ${{ env.ticket_summary }}
           # TICKET_DESCRIPTION: ${{ env.ticket_description }}
