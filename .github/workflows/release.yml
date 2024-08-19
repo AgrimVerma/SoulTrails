@@ -213,54 +213,32 @@ jobs:
           TICKET_TYPE: ${{ env.ticket_type }}
         run: |
           COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
-          PR_DESCRIPTION=$(echo "${PR_DESCRIPTION}" | awk '/### Background/,/###/' | sed -e '1d' -e '$d')
           RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n${RELEASE_NOTES}\n\n*Commit Details*:\n${COMMIT_DETAILS}\n\n*Pr Description*:\n${PR_DESCRIPTION}\n\n*Feature Description:\n${TICKET_SUMMARY}\n${TICKET_DESCRIPTION}*"
   
-          # if [ "$TICKET_TYPE" == "Epic" ]; then
-          #     echo "TICKET_TYPE is 'Epic', calling Jira API..."
-          #     jira_response=$(curl --request GET \
-          #         --url "https://agrim.atlassian.net/rest/api/2/search?jql=parent=$TICKET_ISSUE_KEY&fields=summary,status,assignee,self" \
-          #         --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
-          #         --header 'Accept: application/json')
+          if [ "$TICKET_TYPE" == "Epic" ]; then
+              echo "TICKET_TYPE is 'Epic', calling Jira API..."
+              jira_response=$(curl --request GET \
+                  --url "https://agrim.atlassian.net/rest/api/2/search?jql=parent=$TICKET_ISSUE_KEY&fields=summary,status,assignee,self" \
+                  --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
+                  --header 'Accept: application/json')
           
-          #     echo "Jira API Response: $jira_response"
-          #     extracted_data=$(echo "$jira_response" | jq -r '.issues[] | {key: .key, status: .fields.status.name, summary: .fields.summary, assignee: .fields.assignee.displayName, assignee_username: .fields.assignee.name, self: .self}')
+              echo "Jira API Response: $jira_response"
+              # extracted_data=$(echo "$jira_response" | jq -r '.issues[] | {key: .key, status: .fields.status.name, summary: .fields.summary, assignee: .fields.assignee.displayName, assignee_username: .fields.assignee.name, self: .self}')
+              issues=$(echo "$jira_response" | jq -r '.issues[]')
+              table_rows=""
+              for issue in $issues; do
+                issue_key=$(echo "$issue" | jq -r '.key')
+                summary=$(echo "$issue" | jq -r '.fields.summary')
+                status=$(echo "$issue" | jq -r '.fields.status.name')
+                assignee=$(echo "$issue" | jq -r '.fields.assignee.displayName')
+    
+                issue_link="[$summary](https://agrim.atlassian.net/browse/$issue_key)"
+                table_row="| $issue_link | $status | $assignee |"
+                table_rows="$table_rows\n$table_row"
+              done
               
-          #     FORMATTED_JIRA_ISSUES=$(echo "${extracted_data}" | awk '
-          #       BEGIN {
-          #         print "|| Issue || Status || Assignee ||";
-          #       }
-          #       {
-          #         if ($1 == "{") { in_jira=1; issue_link=""; status=""; assignee=""; }
-          #         if (in_jira && $1 == "\"key\":") {
-          #           gsub(/,$/, "", $2);
-          #           issue_link=sprintf("[[%s|%s]]", $4, $2);
-          #         }
-          #         if (in_jira && $1 == "\"status\":") {
-          #           gsub(/,$/, "", $2);
-          #           status=$2;
-          #         }
-          #         if (in_jira && $1 == "\"summary\":") {
-          #           gsub(/,$/, "", $2);
-          #           issue_link=sprintf("[%s|%s]", $3, $4);
-          #         }
-          #         if (in_jira && $1 == "\"assignee\":") {
-          #           gsub(/,$/, "", $2);
-          #           assignee=sprintf("[~%s]", $4);
-          #         }
-          #         if (in_jira && $1 == "\"assignee_username\":") {
-          #           gsub(/,$/, "", $2);
-          #           assignee=sprintf("[~%s]", $2);
-          #         }
-          #         if (in_jira && $1 == "\"self\":") {
-          #           print "| " issue_link " | " status " | " assignee " |";
-          #           in_jira=0;
-          #         }
-          #       }'
-          #     )
-              
-          #     RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$FORMATTED_JIRA_ISSUES"
-          # fi
+              RELEASE_NOTES="${RELEASE_NOTES}\n\nTask Breakdown\n$table_rows"
+          fi
           echo "Data: $RELEASE_NOTES"
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | \
             sed 's/## //g' | \
