@@ -148,7 +148,7 @@ jobs:
       - name: Extract JIRA Issue Key from PR Description
         id: extract-jira-key
         run: |
-          pr_description="${{ fromJson(steps.get_pr_data.outputs.result).body }}"
+          pr_description="${{ steps.get_pr_data.outputs.background }}"
           jira_issue_key=$(echo "$pr_description" | grep -oE '[A-Z]+-[0-9]+' | head -n 1)
           if [ -z "$jira_issue_key" ]; then
             echo "No JIRA issue key found in the PR description."
