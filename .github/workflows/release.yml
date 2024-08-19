@@ -143,7 +143,7 @@ jobs:
             const backgroundMatch = description.match(/### Background([\s\S]*?)(###|$)/);
             const background = backgroundMatch ? backgroundMatch[1].trim() : '';
             console.log(background)
-            return { background };
+            core.setOutput("background", background);
   
       - name: Extract JIRA Issue Key from PR Description
         id: extract-jira-key
