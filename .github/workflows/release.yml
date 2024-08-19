@@ -131,20 +131,25 @@ jobs:
         id: get_pr_data
         with:
           script: |
-            return (
+            const prData = (
               await github.rest.repos.listPullRequestsAssociatedWithCommit({
                 commit_sha: context.sha,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
               })
             ).data[0];
+            
+            const description = prData.body;
+            const backgroundMatch = description.match(/### Background([\s\S]*?)(###|$)/);
+            const background = backgroundMatch ? backgroundMatch[1].trim() : '';
+            console.log(background)
+            echo "description: $background"
+            echo "pr_description=$background" >> $GITHUB_ENV
   
       - name: Extract JIRA Issue Key from PR Description
         id: extract-jira-key
         run: |
-          pr_data="${{ fromJson(steps.get_pr_data.outputs.result).body }}"
-          pr_description = pr_data.match(/### Background([\s\S]*?)(###|$)/);
-          pr_description = pr_description ? pr_description[1].trim() : '';
+          pr_description = ${{ env.pr_description }}
           echo "pr_description: $pr_description"
           jira_issue_key=$(echo "$pr_description" | grep -oE '[A-Z]+-[0-9]+' | head -n 1)
           if [ -z "$jira_issue_key" ]; then
