@@ -218,25 +218,23 @@ jobs:
           if [ "$TICKET_TYPE" == "Epic" ]; then
               echo "TICKET_TYPE is 'Epic', calling Jira API..."
               jira_response=$(curl --request GET \
-                  --url "https://agrim.atlassian.net/rest/api/2/search?jql=parent=$TICKET_ISSUE_KEY&fields=summary,status,description" \
+                  --url "https://agrim.atlassian.net/rest/api/2/search?jql=parent=$TICKET_ISSUE_KEY&fields=summary,status,assignee" \
                   --user '${{ vars.CONFLUENCE_EMAIL }}:${{ secrets.CONFLUENCE_API_TOKEN }}' \
                   --header 'Accept: application/json')
           
               echo "Jira API Response: $jira_response"
-                extracted_data=$(echo "$jira_response" | jq '.issues[] | {key: .key, status: .fields.status.name, summary: .fields.summary, description: .fields.description}')
-                FORMATTED_JIRA_ISSUES=$(echo "${extracted_data}" | awk '
-                  BEGIN { in_jira=0; }
-                  {
-                    if ($1 == "{") { in_jira=1; if (NR > 1) print ""; }
-                    if (in_jira && $1 == "\"key\":") { gsub(/,$/, "", $2); printf "*Key*: %s\n", $2 }
-                    if (in_jira && $1 == "\"status\":") { gsub(/,$/, "", $2); printf "  *Status*: %s\n", $2 }
-                    if (in_jira && $1 == "\"summary\":") { gsub(/,$/, "", $2); printf "  *Summary*: %s\n", $2 }
-                    if (in_jira && $1 == "\"description\":") { gsub(/,$/, "", $2); printf "  *Description*: %s\n", $2; in_jira=0 }
-                  }'
-                )
-                RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$FORMATTED_JIRA_ISSUES"
-              
-              RELEASE_NOTES="${RELEASE_NOTES}\n\nTask Breakdown\n$table_rows"
+              extracted_data=$(echo "$jira_response" | jq -r '.issues[] | {key: .key, status: .fields.status.name, summary: .fields.summary, assignee: .fields.assignee.displayName}')
+          
+              FORMATTED_JIRA_ISSUES=$(echo "${extracted_data}" | jq -r '
+                def format_row(key, summary, status, assignee):
+                  "| [" + summary + "|https://agrim.atlassian.net/browse/" + key + "] | " + status + " | " + (assignee // "Unassigned") + " |";
+                format_row(.key, .summary, .status, .assignee)')
+          
+              # Prepare the table header
+              TABLE_HEADER="| Issue | Status | Assignee |\n|-------|--------|----------|"
+          
+              # Combine the header and formatted rows
+              RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$TABLE_HEADER\n$FORMATTED_JIRA_ISSUES"
           fi
           echo "Data: $RELEASE_NOTES"
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | \
