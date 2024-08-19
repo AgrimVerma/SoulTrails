@@ -143,8 +143,7 @@ jobs:
         id: extract-jira-key
         run: |
           pr_data="${{ fromJson(steps.get_pr_data.outputs.result).body }}"
-          const pr_description = prData.body;
-          pr_description = pr_description.match(/### Background([\s\S]*?)(###|$)/);
+          pr_description = pr_data.match(/### Background([\s\S]*?)(###|$)/);
           pr_description = pr_description ? pr_description[1].trim() : '';
           echo "pr_description: $pr_description"
           jira_issue_key=$(echo "$pr_description" | grep -oE '[A-Z]+-[0-9]+' | head -n 1)
@@ -153,6 +152,7 @@ jobs:
             exit 1
           fi
           sanitized_jira_issue_key=$(echo "$jira_issue_key" | sed 's/[^a-zA-Z0-9_-]//g')
+          echo "pr_description=$pr_description" >> $GITHUB_ENV
           echo "jira_issue_key=$sanitized_jira_issue_key" >> $GITHUB_ENV
         shell: bash
   
@@ -202,7 +202,7 @@ jobs:
         env:
           RELEASE_NOTES: ${{ fromJson(steps.get-release.outputs.result).body }}
           RELEASE_URL: ${{ fromJson(steps.get-release.outputs.result).url }}
-          PR_DESCRIPTION: ${{ fromJson(steps.get_pr_data.outputs.result).body }}
+          PR_DESCRIPTION: ${{ env.pr_description }}
           COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
           TICKET_SUMMARY: ${{ env.ticket_summary }}
           TICKET_DESCRIPTION: ${{ env.ticket_description }}
