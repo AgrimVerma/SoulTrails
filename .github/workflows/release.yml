@@ -223,18 +223,23 @@ jobs:
                   --header 'Accept: application/json')
           
               echo "Jira API Response: $jira_response"
-              extracted_data=$(echo "$jira_response" | jq -r '.issues[] | {key: .key, status: .fields.status.name, summary: .fields.summary, assignee: .fields.assignee.displayName}')
           
-              FORMATTED_JIRA_ISSUES=$(echo "${extracted_data}" | jq -r '
-                def format_row(key, summary, status, assignee):
-                  "| [" + summary + "|https://agrim.atlassian.net/browse/" + key + "] | " + status + " | " + (assignee // "Unassigned") + " |";
-                format_row(.key, .summary, .status, .assignee)')
+              # Use jq to extract and format the data
+              FORMATTED_JIRA_ISSUES=$(echo "$jira_response" | jq -r '
+                .issues[] | 
+                [
+                  "[\(.fields.summary)|https://agrim.atlassian.net/browse/\(.key)]",
+                  .fields.status.name,
+                  (.fields.assignee.displayName // "Unassigned")
+                ] | 
+                @tsv' | awk -F'\t' '
+                BEGIN { print "| Issue | Status | Assignee |"; print "|-------|--------|----------|" }
+                {
+                  printf "| %s | %s | %s |\n", $1, $2, $3
+                }')
           
-              # Prepare the table header
-              TABLE_HEADER="| Issue | Status | Assignee |\n|-------|--------|----------|"
-          
-              # Combine the header and formatted rows
-              RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$TABLE_HEADER\n$FORMATTED_JIRA_ISSUES"
+              # Add the formatted Jira issues to the release notes
+              RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$FORMATTED_JIRA_ISSUES"
           fi
           echo "Data: $RELEASE_NOTES"
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | \
