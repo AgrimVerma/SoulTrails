@@ -142,9 +142,6 @@ jobs:
             const description = prData.body;
             const backgroundMatch = description.match(/### Background([\s\S]*?)(###|$)/);
             const background = backgroundMatch ? backgroundMatch[1].trim() : '';
-            console.log(prData)
-            console.log(backgroundMatch)
-            console.log(background)
             
             return { background };
   
