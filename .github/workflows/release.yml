@@ -143,21 +143,19 @@ jobs:
             const backgroundMatch = description.match(/### Background([\s\S]*?)(###|$)/);
             const background = backgroundMatch ? backgroundMatch[1].trim() : '';
             console.log(background)
-            echo "description: $background"
-            echo "pr_description=$background" >> $GITHUB_ENV
+            return { background };
   
       - name: Extract JIRA Issue Key from PR Description
         id: extract-jira-key
+        env:
+          PR_DESCRIPTION: ${{ steps.get_pr_background.outputs.background }}"
         run: |
-          pr_description = ${{ env.pr_description }}
-          echo "pr_description: $pr_description"
-          jira_issue_key=$(echo "$pr_description" | grep -oE '[A-Z]+-[0-9]+' | head -n 1)
+          jira_issue_key=$(echo "$PR_DESCRIPTION" | grep -oE '[A-Z]+-[0-9]+' | head -n 1)
           if [ -z "$jira_issue_key" ]; then
             echo "No JIRA issue key found in the PR description."
             exit 1
           fi
           sanitized_jira_issue_key=$(echo "$jira_issue_key" | sed 's/[^a-zA-Z0-9_-]//g')
-          echo "pr_description=$pr_description" >> $GITHUB_ENV
           echo "jira_issue_key=$sanitized_jira_issue_key" >> $GITHUB_ENV
         shell: bash
   
@@ -207,7 +205,7 @@ jobs:
         env:
           RELEASE_NOTES: ${{ fromJson(steps.get-release.outputs.result).body }}
           RELEASE_URL: ${{ fromJson(steps.get-release.outputs.result).url }}
-          PR_DESCRIPTION: ${{ env.pr_description }}
+          PR_DESCRIPTION: ${{ steps.get_pr_background.outputs.background }}"
           COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
           TICKET_SUMMARY: ${{ env.ticket_summary }}
           TICKET_DESCRIPTION: ${{ env.ticket_description }}
