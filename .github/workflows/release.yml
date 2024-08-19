@@ -213,7 +213,7 @@ jobs:
           TICKET_TYPE: ${{ env.ticket_type }}
         run: |
           COMMIT_DETAILS=$(echo "${COMMIT_DETAILS}" | sed 's/\\:/:/g')
-          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n${RELEASE_NOTES}\n\n*Commit Details*:\n${COMMIT_DETAILS}\n\n*Pr Description*:\n${PR_DESCRIPTION}\n\n*Feature Description:\n${TICKET_SUMMARY}\n${TICKET_DESCRIPTION}*"
+          RELEASE_NOTES="✅ New *${{ github.event.repository.name }}* Release [${{ needs.version-tag.outputs.version }}](${RELEASE_URL}) $(date)\n${RELEASE_NOTES}\n\n*Commit Details*:\n${COMMIT_DETAILS}\n\n*Pr Description*:\n${PR_DESCRIPTION}\n\n*Feature Description*:\n${TICKET_SUMMARY}\n${TICKET_DESCRIPTION}"
   
           if [ "$TICKET_TYPE" == "Epic" ]; then
               echo "TICKET_TYPE is 'Epic', calling Jira API..."
@@ -233,13 +233,13 @@ jobs:
                   (.fields.assignee.displayName // "Unassigned")
                 ] | 
                 @tsv' | awk -F'\t' '
-                BEGIN { print "| Issue | Status | Assignee |"; print "|-------|--------|----------|" }
+                BEGIN { print "| Item | Status | Party Responsible |" }
                 {
                   printf "| %s | %s | %s |\n", $1, $2, $3
                 }')
           
               # Add the formatted Jira issues to the release notes
-              RELEASE_NOTES="${RELEASE_NOTES}\n\nJira Issues:\n$FORMATTED_JIRA_ISSUES"
+              RELEASE_NOTES="${RELEASE_NOTES}\n\n*DEVELOPMENT*:\n$FORMATTED_JIRA_ISSUES"
           fi
           echo "Data: $RELEASE_NOTES"
           RELEASE_NOTES=$(echo -e "${RELEASE_NOTES}" | \
