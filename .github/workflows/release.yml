@@ -142,7 +142,7 @@ jobs:
       - name: Extract JIRA Issue Key from PR Description
         id: extract-jira-key
         run: |
-          pr_data="${{ steps.get_pr_data.outputs.background }}"
+          pr_data="${{ fromJson(steps.get_pr_data.outputs.result).body }}"
           const pr_description = prData.body;
           pr_description = pr_description.match(/### Background([\s\S]*?)(###|$)/);
           pr_description = pr_description ? pr_description[1].trim() : '';
@@ -202,7 +202,7 @@ jobs:
         env:
           RELEASE_NOTES: ${{ fromJson(steps.get-release.outputs.result).body }}
           RELEASE_URL: ${{ fromJson(steps.get-release.outputs.result).url }}
-          PR_DESCRIPTION: ${{ steps.get_pr_data.outputs.background }}
+          PR_DESCRIPTION: ${{ fromJson(steps.get_pr_data.outputs.result).body }}
           COMMIT_DETAILS: ${{ needs.version-tag.outputs.commit_details }}
           TICKET_SUMMARY: ${{ env.ticket_summary }}
           TICKET_DESCRIPTION: ${{ env.ticket_description }}
